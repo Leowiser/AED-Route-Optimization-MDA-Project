@@ -94,7 +94,7 @@ class route:
     # Function that gets the duration, route and coordinates of a route
     # The route can be direct or go through other points first
     def directions(self, coordinates, profile = 'foot-walking'):
-        client = self.Client
+        client = self.Client_ors
         route = client.directions(coordinates=coordinates,
                                    profile=profile,
                                    format='geojson',
