@@ -105,5 +105,165 @@ class route:
         route_dict['coordinates'] = route.get('features')[0]['geometry']['coordinates']
         return route_dict
     
+    # Function to get all possible routes through the AEDs that are close to the patient
+    # Returns a data frame with the coordinates of the Responder, duration through the specific AED,
+    # duration for the direct route, and the coordinates of the used AED
+    def possible_routing(self, Patient, Responders, AEDs):
+        AED_loc = self.closest_location(Patient, AEDs)
+        Responders_loc = self.closest_location(Patient, Responders)
+        source = []
+        for i in range(len(Responders_loc)):
+            route_Responder = self.directions([Responders_loc[i], Patient])
+            duration_direct = route_Responder['duration']
+            for j in range(len(AED_loc)):
+                route_AED = self.directions([Responders_loc[i], AED_loc[j], Patient])
+                longitude = Responders_loc[i][0]
+                latitude = Responders_loc[i][1]
+                duration = route_AED['duration']
+                AED_coordinates = AED_loc[j]
+                source.append([longitude, latitude, duration_direct, duration, AED_coordinates])
+                # sleep is needed to not send to many requests to the API (free API problem)
+                time.sleep(1)
+
+        df_duration_AED = pd.DataFrame(source, columns = ['longitude', 'latitude', 'duration_direct', 'duration_through_AED', 'AED_coordinates'])
+        return df_duration_AED
+
+    # Transform a list of lists of coordinates to a data frame with two columns
+    def get_coordinates(self, coordinate_list):
+        # first sublist element = longitude; second = latitude
+        lon = list(list(zip(*coordinate_list))[0])
+        lat = list(list(zip(*coordinate_list))[1])
+        dict = {'lon':lon,'lat':lat}
+        df_latlong = pd.DataFrame(dict)
+        return df_latlong
+    
+    # Function to find the responder that is send directly and through the AED.
+    # The results are plotted using plotly
+    def send_responders(self, Patient, Responders, AEDs):
+        df_duration = self.possible_routing(Patient, Responders, AEDs)
+        # latitude of the closest responder
+        lat_direct = df_duration.iloc[df_duration.idxmin()['duration_direct']]['latitude']
+        # latitude of the Responder with the fastest time through an AED
+        lat_AED = df_duration.iloc[df_duration.idxmin()['duration_through_AED']]['latitude']
+        # longitude of the closest responder
+        lon_direct = df_duration.iloc[df_duration.idxmin()['duration_direct']]['longitude']
+        # longitude of the Responder with the fastest time through an AED
+        lon_AED = df_duration.iloc[df_duration.idxmin()['duration_through_AED']]['longitude']
+        # coordinates of the AED with the fastest route
+        subset = df_duration[(df_duration['duration_direct']>df_duration.min()['duration_direct']) & (df_duration['duration_direct']>df_duration.min()['duration_direct'])]
+        # Check if the fastest response time with AED is only slightly slower/faster than the direct routing and how different it is
+        # for the second fastest
+        dif_AED_direct = df_duration.iloc[df_duration.idxmin()['duration_direct']]['duration_through_AED'] - df_duration.min()['duration_direct']
+        dif_2nd_1st = df_duration.iloc[df_duration.idxmin()['duration_direct']]['duration_through_AED'] - subset.min()['duration_through_AED']
+        # difference between fastest and second fastest direct way
+        dif_2nd_1st_direct = df_duration.iloc[df_duration['duration_direct'].nsmallest(2).index[1]]['duration_direct'] - df_duration.min()['duration_direct']
+
+        # Now check if the fastest through AED is the same as the fastest direct 
+        if lat_direct==lat_AED and lon_direct==lon_AED:
+            # Check if the difference between direct route and route through AED is miner (less than 30 seconds)
+            # and if the difference between second fastest direct and the fastest direct is not to big (60 seconds)
+            # This is done because time is of essence and otherwise the fast responder could be left out
+            if ((dif_AED_direct < 30) and(dif_2nd_1st_direct < 60)):
+                # If both is true:
+                # - Second fastest direct time will be send directly
+                # - Fastest direct and AED responder will be send through the AED
+                coord_direct = (df_duration.iloc[df_duration['duration_direct'].nsmallest(2).index[1]]['longitude'], df_duration.iloc[df_duration['duration_direct'].nsmallest(2).index[1]]['latitude'])
+                coord_AED =  (lon_direct, lat_direct)
+                AED_coordinates = df_duration.iloc[df_duration.idxmin()['duration_direct']]['AED_coordinates']
+            # If this is not true:
+            # - Fastes direct responder will be send directly
+            # - Second fastest through AED responder will be send through the AED
+            else:
+                coord_direct = (lon_direct, lat_direct)
+                lat_AED_2nd = subset.iloc[subset.idxmin()['duration_through_AED']]['latitude']
+                lon_AED_2nd = subset.iloc[subset.idxmin()['duration_through_AED']]['longitude']
+                coord_AED = (lon_AED_2nd, lat_AED_2nd)
+                AED_coordinates = subset.iloc[subset.idxmin()['duration_through_AED']]['AED_coordinates']
+        else:
+            # If the fastest direct responder and thorugh AED responder are different:
+            # - Take the fastest responders for both
+            coord_direct = (lon_direct, lat_direct)
+            coord_AED = (lon_AED, lat_AED)
+            AED_coordinates = df_duration.iloc[df_duration.idxmin()['duration_through_AED']]['AED_coordinates']
+
+        # Get both routes
+        direct_route = self.directions([coord_direct, Patient])
+        AED_route = self.directions([coord_AED, AED_coordinates, Patient])
+
+        # get a dataframe of the description of the route for plotting
+        df_latlong_direct = self.get_coordinates(direct_route['coordinates'])
+        df_latlong_AED = self.get_coordinates(AED_route['coordinates'])      
+
+        # plot the direct way
+        fig = px.line_mapbox(df_latlong_direct, lat="lat", lon="lon", zoom=3, height=300)
+        # Add the route through the AED
+        fig.add_trace(px.line_mapbox(df_latlong_AED, lat='lat', lon='lon').data[0]) 
+        
+        # Add marker for the first responders initial location
+        beginning_direct = go.Scattermapbox(
+            lat=[df_latlong_direct['lat'].iloc[0]],
+            lon=[df_latlong_direct['lon'].iloc[0]],
+            mode='markers',
+            marker=go.scattermapbox.Marker(
+                size=10,
+                color='darkblue'
+            ),
+            text='First responder direct',  # Text to display when hovering over the marker
+            hoverinfo='text'
+        )
+        
+        # Add markers for the first responder that takes the route through the AED
+        beginning_AED = go.Scattermapbox(
+            lat=[df_latlong_AED['lat'].iloc[0]],
+            lon=[df_latlong_AED['lon'].iloc[0]],
+            mode='markers',
+            marker=go.scattermapbox.Marker(
+                size=10,
+                color='orange'
+            ),
+            text='Start responder through AED',
+            hoverinfo='text'
+        )
+
+        # Add marker for the Patient
+        Patient = go.Scattermapbox(
+            lat=[df_latlong_AED['lat'].iloc[-1]],
+            lon=[df_latlong_AED['lon'].iloc[-1]],
+            mode='markers',
+            marker=go.scattermapbox.Marker(
+                size=15,
+                color='red'
+            ),
+            text='Patient',
+            hoverinfo='text' 
+        )
+
+        # Add a marker for the AED
+        AED_marker = go.Scattermapbox(
+            lat=[AED_coordinates[1]],
+            lon=[AED_coordinates[0]],
+            mode='markers',
+            marker=go.scattermapbox.Marker(
+                size=15,
+                color='green'
+            ),
+            text='AED device',
+            hoverinfo='text'
+        )
+        
+        # Add the markers to the figure
+        fig.add_trace(beginning_direct)
+        fig.add_trace(beginning_AED)
+        fig.add_trace(Patient)
+        fig.add_trace(AED_marker)
+        
+        # Color the direct responder in darkblue and the one through the AED in orange
+        fig.update_traces(line=dict(color='darkblue', width = 4), selector=0)
+        fig.update_traces(line=dict(color='orange', width = 4), selector=1)
+        fig.update_layout(mapbox_style="carto-positron", mapbox_zoom=14, mapbox_center_lat=df_latlong_direct['lat'].iloc[0],
+                          margin={"r": 0, "t": 0, "l": 0, "b": 0})
+        fig.show()
+
+    
 
     
