@@ -10,14 +10,14 @@ from shapely import geometry
 
 class route:
     def __init__(self):
-        self.Client = openrouteservice.Client(key='5b3ce3597851110001cf624802e069d6633748a5ae4e9842334f1dc2')
+        self.Client_ors = openrouteservice.Client(key='5b3ce3597851110001cf624802e069d6633748a5ae4e9842334f1dc2')
 
     # function to find the AEDs and Responders in a 10 minute walking distance from the patient
     # Nearly same as closest Responders
-    def closest_location(self, Patient, Location):
+    def closest_location(self, Patient, Location, profile = "foot-walking"):
         # patient must be a tuple
         # AEDS must be a dataframe with columns (This is gathered in another file) named latitude and longitude
-        profile = 'foot-walking' # only taking walking distance
+        # profile by default is walking by foot
 
         # set the parameters for conducting an isochrone search
         isochrones_parameters = {
@@ -28,7 +28,7 @@ class route:
         }
 
         # personal API key for openrouteservices
-        ors_client_custom = client.Client(key='5b3ce3597851110001cf624802e069d6633748a5ae4e9842334f1dc2', base_url='https://api.openrouteservice.org')
+        ors_client_custom = self.Client_ors
 
         # Get the area that can be reached in 10 minutes walking.
         # This creates an isochrone wich is the whole area surounding the patient that is reachable in 10 minutes by foot.
@@ -68,17 +68,17 @@ class route:
         return coordinate_tuples
     
     # function to calculate the durations if Responders go directly to the Patient
-    def duration_to_Patient(self, Patient, Responders):
+    def duration_to_Patient(self, Patient, Responders, profile = 'foot-walking'):
         # find the closest Responders
-        x = self.closest_location(Patient, Responders)
+        x = self.closest_location(Patient, Responders, profile)
         # append the location of the patient to use it later
         x.append(Patient)
         # calculate a matrix that gives the duration of every closes responder 
         # to the patient directly
-        client = openrouteservice.Client(key='5b3ce3597851110001cf624802e069d6633748a5ae4e9842334f1dc2')
+        client = self.Client_ors
         matrix = client.distance_matrix(
                     locations=x,
-                    profile="foot-walking",
+                    profile=profile,
                     sources = list(range(len(x)-1)),
                     destinations = [len(x)-1],
                     metrics=['duration']
@@ -93,10 +93,10 @@ class route:
 
     # Function that gets the duration, route and coordinates of a route
     # The route can be direct or go through other points first
-    def foot_walking(self, coordinates):
+    def directions(self, coordinates, profile = 'foot-walking'):
         client = self.Client
         route = client.directions(coordinates=coordinates,
-                                   profile='foot-walking',
+                                   profile=profile,
                                    format='geojson',
                                    validate=False)
         route_dict = {}
