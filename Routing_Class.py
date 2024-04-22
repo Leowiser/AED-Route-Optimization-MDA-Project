@@ -6,6 +6,9 @@ import numpy as np
 import pandas as pd
 import geopandas as gpd
 from shapely import geometry
+import time
+import geopy.distance
+import plotly.express as px
 
 
 class route:
@@ -14,7 +17,7 @@ class route:
 
     # function to find the AEDs and Responders in a 10 minute walking distance from the patient
     # Nearly same as closest Responders
-    def closest_location(self, Patient, Location, profile = "foot-walking"):
+    def closest_location(self, Patient, Location, profile = "foot-walking", threshold =600):
         # patient must be a tuple
         # AEDS must be a dataframe with columns (This is gathered in another file) named latitude and longitude
         # profile by default is walking by foot
@@ -24,7 +27,7 @@ class route:
         'locations': [Patient],
         'profile': profile,
         'range_type': 'time',
-        'range': [600] # 10 minutes away (600 seconds)
+        'range': [threshold] # 10 minutes away (600 seconds)
         }
 
         # personal API key for openrouteservices
@@ -44,7 +47,7 @@ class route:
 
         # Get the coordinates (lat, lon) for all Responders.
         df = pd.DataFrame({'lat':Location.loc[:,"latitude"], 'lon':Location.loc[:,"longitude"]}) # lat as 1st column longitude as 2nd
-        df['coords'] = list(zip(df['lat'],df['lon']))
+        df['coords'] = list(zip(df['lon'],df['lat']))
 
         # Transform the coordinates to a geodataframe points
         df['coords'] = df['coords'].apply(geometry.Point)
@@ -95,6 +98,7 @@ class route:
     # The route can be direct or go through other points first
     def directions(self, coordinates, profile = 'foot-walking'):
         client = self.Client_ors
+        time.sleep(1.0)
         route = client.directions(coordinates=coordinates,
                                    profile=profile,
                                    format='geojson',
@@ -108,26 +112,50 @@ class route:
     # Function to get all possible routes through the AEDs that are close to the patient
     # Returns a data frame with the coordinates of the Responder, duration through the specific AED,
     # duration for the direct route, and the coordinates of the used AED
-    def possible_routing(self, Patient, Responders, AEDs):
-        AED_loc = self.closest_location(Patient, AEDs)
+    def possible_routing(self, Patient, Responders, AEDs, threshold = 700):
+        # Check if AEDs exist in the direct circumference (first in 8 minute difference of the patient)
+        t_loc = 480
         Responders_loc = self.closest_location(Patient, Responders)
-        source = []
-        for i in range(len(Responders_loc)):
-            route_Responder = self.directions([Responders_loc[i], Patient])
-            duration_direct = route_Responder['duration']
-            for j in range(len(AED_loc)):
-                route_AED = self.directions([Responders_loc[i], AED_loc[j], Patient])
-                longitude = Responders_loc[i][0]
-                latitude = Responders_loc[i][1]
-                duration = route_AED['duration']
-                AED_coordinates = AED_loc[j]
-                source.append([longitude, latitude, duration_direct, duration, AED_coordinates])
-                # sleep is needed to not send to many requests to the API (free API problem)
-                time.sleep(1)
+        # if there are less than 3 responders nearby the distance of the isochrone is increased by 2 minutes
+        while len(Responders_loc) < 3:
+            t_loc += 120
+            Responders_loc = self.closest_location(Patient, Responders, threshold=t_loc)
+        
+        # create a data frame based on the coordinates of the close responders
+        Responder_df = pd.DataFrame(Responders_loc, columns =['longitude', 'latitude'])
+        # also get the coordinates as a tuple
+        Responder_df['Responder_loc'] = list(zip(Responder_df['longitude'],Responder_df['latitude']))
+        # get the coordinates of the patient
+        Responder_df['Patient_lon'] = Patient[0]
+        Responder_df['Patient_lat'] = Patient[1]
+        Responder_df['Patient_loc'] = list(zip(Responder_df['Patient_lon'],Responder_df['Patient_lat']))
+        # get the distance between responders and patients
+        Responder_df['dist_patient'] = Responder_df.apply(lambda row: geopy.distance.distance(row['Responder_loc'], row['Patient_loc']).meters, axis=1)
+        # if the distance is lower than the threshold (default is 700 meters), the foot walking distance is calculated and otherwise the value
+        # is set to a high value.
+        # This is done to minimize the amount the API is used as this is restricted in the free version
+        Responder_df['duration_direct']=[self.directions([i, pa])['duration'] if d<threshold else 5000 for i, d in zip(Responder_df['Responder_loc'], Responder_df['dist_patient'])]
 
-        df_duration_AED = pd.DataFrame(source, columns = ['longitude', 'latitude', 'duration_direct', 'duration_through_AED', 'AED_coordinates'])
-        return df_duration_AED
+        # Check if AEDsare close by (first in 8 minute difference of the patient)
+        t_AED = 480
+        AED_loc = self.closest_location(Patient, AEDs, threshold=t_AED)
+        while len(AED_loc) < 3:
+            # if there are less than 3 AEDs are nearby the distance of the isochrone is increased by 2 minutes
+            t_AED += 120
+            AED_loc = self.closest_location(Patient, AEDs, threshold=t_AED)
 
+        # Create data frames with the coordinates    
+        AED_df = pd.DataFrame(zip(AED_loc), columns =['AED_coordinates'])
+        # combine the both data frames
+        df_merged = pd.merge(Responder_df.assign(key=1), AED_df.assign(key=1),
+                        on='key').drop('key', axis=1)
+        # Similar as before calculate the distance between AED and the responders.
+        df_merged['dist_AED'] = df_merged.apply(lambda row: geopy.distance.distance(row['Responder_loc'], row['AED_coordinates']).meters, axis=1)
+        # If the Responders are closer to the AED than the threshold (by default 700 meters as the bird flies, as this takes around 10 minutes to walk),
+        # the duration by foot form the responder through the AED to the patient is calculated and stored in the Data Frame.
+        df_merged['duration_through_AED']=[self.directions([df_merged['Responder_loc'][i], df_merged['AED_coordinates'][i],df_merged['Patient_loc'][i]])['duration'] if df_merged['dist_AED'][i] < threshold else 5000 for i in range(len(df_merged['dist_AED']))]
+        return df_merged
+        
     # Transform a list of lists of coordinates to a data frame with two columns
     def get_coordinates(self, coordinate_list):
         # first sublist element = longitude; second = latitude
@@ -158,33 +186,36 @@ class route:
         # difference between fastest and second fastest direct way
         dif_2nd_1st_direct = df_duration.iloc[df_duration['duration_direct'].nsmallest(2).index[1]]['duration_direct'] - df_duration.min()['duration_direct']
 
-        # Now check if the fastest through AED is the same as the fastest direct 
-        if lat_direct==lat_AED and lon_direct==lon_AED:
-            # Check if the difference between direct route and route through AED is miner (less than 30 seconds)
-            # and if the difference between second fastest direct and the fastest direct is not to big (60 seconds)
-            # This is done because time is of essence and otherwise the fast responder could be left out
-            if ((dif_AED_direct < 30) and(dif_2nd_1st_direct < 60)):
-                # If both is true:
-                # - Second fastest direct time will be send directly
-                # - Fastest direct and AED responder will be send through the AED
-                coord_direct = (df_duration.iloc[df_duration['duration_direct'].nsmallest(2).index[1]]['longitude'], df_duration.iloc[df_duration['duration_direct'].nsmallest(2).index[1]]['latitude'])
-                coord_AED =  (lon_direct, lat_direct)
-                AED_coordinates = df_duration.iloc[df_duration.idxmin()['duration_direct']]['AED_coordinates']
-            # If this is not true:
-            # - Fastes direct responder will be send directly
-            # - Second fastest through AED responder will be send through the AED
+        # First check if any responder exist that is not furhter away than 600 seconds
+        # DISCUSS
+        if df_duration[df_duration['duration_direct']<600].any()['duration_direct'] and df_duration[df_duration['duration_through_AED']<600].any()['duration_through_AED']:
+            # Now check if the fastest through AED is the same as the fastest direct 
+            if lat_direct==lat_AED and lon_direct==lon_AED:
+                # Check if the difference between direct route and route through AED is miner (less than 30 seconds)
+                # and if the difference between second fastest direct and the fastest direct is not to big (60 seconds)
+                # This is done because time is of essence and otherwise the fast responder could be left out
+                if ((dif_AED_direct < 30) and(dif_2nd_1st_direct < 60)):
+                    # If both is true:
+                    # - Second fastest direct time will be send directly
+                    # - Fastest direct and AED responder will be send through the AED
+                    coord_direct = (df_duration.iloc[df_duration['duration_direct'].nsmallest(2).index[1]]['longitude'], df_duration.iloc[df_duration['duration_direct'].nsmallest(2).index[1]]['latitude'])
+                    coord_AED =  (lon_direct, lat_direct)
+                    AED_coordinates = df_duration.iloc[df_duration.idxmin()['duration_direct']]['AED_coordinates']
+                # If this is not true:
+                # - Fastes direct responder will be send directly
+                # - Second fastest through AED responder will be send through the AED
+                else:
+                    coord_direct = (lon_direct, lat_direct)
+                    lat_AED_2nd = subset.iloc[subset.idxmin()['duration_through_AED']]['latitude']
+                    lon_AED_2nd = subset.iloc[subset.idxmin()['duration_through_AED']]['longitude']
+                    coord_AED = (lon_AED_2nd, lat_AED_2nd)
+                    AED_coordinates = subset.iloc[subset.idxmin()['duration_through_AED']]['AED_coordinates']
             else:
+                # If the fastest direct responder and thorugh AED responder are different:
+                # - Take the fastest responders for both
                 coord_direct = (lon_direct, lat_direct)
-                lat_AED_2nd = subset.iloc[subset.idxmin()['duration_through_AED']]['latitude']
-                lon_AED_2nd = subset.iloc[subset.idxmin()['duration_through_AED']]['longitude']
-                coord_AED = (lon_AED_2nd, lat_AED_2nd)
-                AED_coordinates = subset.iloc[subset.idxmin()['duration_through_AED']]['AED_coordinates']
-        else:
-            # If the fastest direct responder and thorugh AED responder are different:
-            # - Take the fastest responders for both
-            coord_direct = (lon_direct, lat_direct)
-            coord_AED = (lon_AED, lat_AED)
-            AED_coordinates = df_duration.iloc[df_duration.idxmin()['duration_through_AED']]['AED_coordinates']
+                coord_AED = (lon_AED, lat_AED)
+                AED_coordinates = df_duration.iloc[df_duration.idxmin()['duration_through_AED']]['AED_coordinates']
 
         # Get both routes
         direct_route = self.directions([coord_direct, Patient])
@@ -198,7 +229,7 @@ class route:
         fig = px.line_mapbox(df_latlong_direct, lat="lat", lon="lon", zoom=3, height=300)
         # Add the route through the AED
         fig.add_trace(px.line_mapbox(df_latlong_AED, lat='lat', lon='lon').data[0]) 
-        
+            
         # Add marker for the first responders initial location
         beginning_direct = go.Scattermapbox(
             lat=[df_latlong_direct['lat'].iloc[0]],
@@ -263,7 +294,4 @@ class route:
         fig.update_layout(mapbox_style="carto-positron", mapbox_zoom=14, mapbox_center_lat=df_latlong_direct['lat'].iloc[0],
                           margin={"r": 0, "t": 0, "l": 0, "b": 0})
         fig.show()
-
-    
-
     
