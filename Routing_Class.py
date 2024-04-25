@@ -117,7 +117,7 @@ class route:
         t_loc = 480
         Responders_loc = self.closest_location(Patient, Responders)
         # if there are less than 3 responders nearby the distance of the isochrone is increased by 2 minutes
-        while len(Responders_loc) < 3:
+        while len(Responders_loc) < 2:
             t_loc += 120
             Responders_loc = self.closest_location(Patient, Responders, threshold=t_loc)
         
@@ -182,13 +182,12 @@ class route:
         # Check if the fastest response time with AED is only slightly slower/faster than the direct routing and how different it is
         # for the second fastest
         dif_AED_direct = df_duration.iloc[df_duration.idxmin()['duration_direct']]['duration_through_AED'] - df_duration.min()['duration_direct']
-        dif_2nd_1st = df_duration.iloc[df_duration.idxmin()['duration_direct']]['duration_through_AED'] - subset.min()['duration_through_AED']
         # difference between fastest and second fastest direct way
         dif_2nd_1st_direct = df_duration.iloc[df_duration['duration_direct'].nsmallest(2).index[1]]['duration_direct'] - df_duration.min()['duration_direct']
 
         # First check if any responder exist that is not furhter away than 600 seconds
         # DISCUSS
-        if df_duration[df_duration['duration_direct']<600].any()['duration_direct'] and df_duration[df_duration['duration_through_AED']<600].any()['duration_through_AED']:
+        if df_duration[df_duration['duration_direct']<1200].any()['duration_direct'] and df_duration[df_duration['duration_through_AED']<1200].any()['duration_through_AED']:
             # Now check if the fastest through AED is the same as the fastest direct 
             if lat_direct==lat_AED and lon_direct==lon_AED:
                 # Check if the difference between direct route and route through AED is miner (less than 30 seconds)
@@ -221,7 +220,8 @@ class route:
         direct_route = self.directions([coord_direct, Patient])
         AED_route = self.directions([coord_AED, AED_coordinates, Patient])
 
-        # get a dataframe of the description of the route for plotting
+        # Get a dataframe of the description of the route for plotting
+        # To transform the route into usable data frame for plotting with the get_coordinates function
         df_latlong_direct = self.get_coordinates(direct_route['coordinates'])
         df_latlong_AED = self.get_coordinates(AED_route['coordinates'])      
 
