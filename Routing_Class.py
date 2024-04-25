@@ -9,6 +9,7 @@ from shapely import geometry
 import time
 import geopy.distance
 import plotly.express as px
+import plotly.graph_objects as go
 
 
 class route:
