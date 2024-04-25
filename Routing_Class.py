@@ -134,7 +134,7 @@ class route:
         # if the distance is lower than the threshold (default is 700 meters), the foot walking distance is calculated and otherwise the value
         # is set to a high value.
         # This is done to minimize the amount the API is used as this is restricted in the free version
-        Responder_df['duration_direct']=[self.directions([i, pa])['duration'] if d<threshold else 5000 for i, d in zip(Responder_df['Responder_loc'], Responder_df['dist_patient'])]
+        Responder_df['duration_direct']=[self.directions([i, Patient])['duration'] if d<threshold else 5000 for i, d in zip(Responder_df['Responder_loc'], Responder_df['dist_patient'])]
 
         # Check if AEDsare close by (first in 8 minute difference of the patient)
         t_AED = 480
