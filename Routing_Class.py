@@ -88,8 +88,8 @@ class route:
                     metrics=['duration']
                 )
         source = []
-        for i in range(len(matr["sources"])):
-            source.append([matr['sources'][i]['location'][0], matr['sources'][i]['location'][1],float(matr['durations'][i][0])])
+        for i in range(len(matrix["sources"])):
+            source.append([matrix['sources'][i]['location'][0], matrix['sources'][i]['location'][1],float(matrix['durations'][i][0])])
 
         # build a data frame with the duration and the coordinates of the Responder
         df_duration = pd.DataFrame(source, columns = ['longitude', 'latitude', 'duration_direct']) 
