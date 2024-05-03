@@ -114,7 +114,7 @@ class route:
     # Returns a data frame with the coordinates of the Responder, duration through the specific AED,
     # duration for the direct route, and the coordinates of the used AED
     def possible_routing(self, Patient, Responders, AEDs, threshold = 700):
-        # Check if AEDs exist in the direct circumference (first in 8 minute difference of the patient)
+        # Check if responders exist in the direct circumference (first in 8 minute difference of the patient)
         t_loc = 480
         Responders_loc = self.closest_location(Patient, Responders)
         # if there are less than 3 responders nearby the distance of the isochrone is increased by 2 minutes
@@ -145,7 +145,7 @@ class route:
             t_AED += 120
             AED_loc = self.closest_location(Patient, AEDs, threshold=t_AED)
 
-        # Create data frames with the coordinates    
+        # Create data frames with the coordinates
         AED_df = pd.DataFrame(zip(AED_loc), columns =['AED_coordinates'])
         # combine the both data frames
         df_merged = pd.merge(Responder_df.assign(key=1), AED_df.assign(key=1),
