@@ -1,3 +1,14 @@
+import openrouteservice
+from openrouteservice import client
+import numpy as np
+import pandas as pd
+import geopandas as gpd
+from shapely import geometry
+import time
+import geopy.distance
+
+
+
 class simulation:
     def __init__(self):
         self.Client_ors = openrouteservice.Client(key='5b3ce3597851110001cf624802e069d6633748a5ae4e9842334f1dc2')
