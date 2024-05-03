@@ -116,7 +116,7 @@ class route:
     def possible_routing(self, Patient, Responders, AEDs, threshold = 700):
         # Check if responders exist in the direct circumference (first in 8 minute difference of the patient)
         t_loc = 480
-        Responders_loc = self.closest_location(Patient, Responders)
+        Responders_loc = self.closest_location(Patient, Responders)    # shouldn't it be self.closest_location(Patient, Responders, threshold=t_loc)?
         # if there are less than 3 responders nearby the distance of the isochrone is increased by 2 minutes
         while len(Responders_loc) < 2:
             t_loc += 120
