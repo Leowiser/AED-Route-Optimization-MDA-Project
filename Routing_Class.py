@@ -114,11 +114,12 @@ class route:
     # Returns a data frame with the coordinates of the Responder, duration through the specific AED,
     # duration for the direct route, and the coordinates of the used AED
     def possible_routing(self, Patient, Responders, AEDs, threshold = 700):
+        # Add an if clause for cases when there's only two 2 responders?
         # Check if responders exist in the direct circumference (first in 8 minute difference of the patient)
         t_loc = 480
         Responders_loc = self.closest_location(Patient, Responders)    # shouldn't it be self.closest_location(Patient, Responders, threshold=t_loc)?
         # if there are less than 3 responders nearby the distance of the isochrone is increased by 2 minutes
-        while len(Responders_loc) < 2:
+        while len(Responders_loc) < 2:    # This should be while len(Responders_loc) < 3 to really match the comment above.  
             t_loc += 120
             Responders_loc = self.closest_location(Patient, Responders, threshold=t_loc)
         
