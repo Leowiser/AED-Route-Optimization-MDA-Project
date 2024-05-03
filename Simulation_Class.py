@@ -41,7 +41,7 @@ class simulation:
         for k in range(len(Patient)):
             coordinate_tuples = [[(point.x, point.y), k] for point in points if point.within(gdf[0][k])]
             df_temporary = pd.DataFrame(coordinate_tuples, columns = ['coordinates', 'patient'])
-            df = pd.concat([df,df_temporary])
+            df = pd.concat([df,df_temporary], ignore_index = True)
         # Returns a list of tuples of the coordinates of the responders. (long, lat)
         
         return df
@@ -109,19 +109,19 @@ class simulation:
             if ((len(subset_responder[i]) == 0) and (len(subset_vector[i]) > 0)):
                 print('No responder is in a 10 minute radius')
                 df_vector_i = self.fastest_vector(Patient.loc[i], subset_vector[i])
-                df_duration = pd.concat([df_duration, df_vector_i])
+                df_duration = pd.concat([df_duration, df_vector_i], ignore_index = True)
             # If vectors and responders are in the isochrones new differentiations are made.
             elif ((len(subset_responder[i]) > 0) and (len(subset_vector[i]) > 0)):
                 # If there are no AEDs are close by it is just a comparisson between the directly send responder and the vector.
                 if((len(subset_aed[i]) == 0) or (len(subset_responder[i])<2)):
                     print('Comparing direct responder vs. vectors')
                     df_direct_i = self.direct_vs_vector(Patient.loc[i], subset_vector[i], subset_responder[i])
-                    df_duration= pd.concat([df_duration, df_direct_i])
+                    df_duration= pd.concat([df_duration, df_direct_i], ignore_index = True)
                 # Else the direct, indirect and vectors are calculated.
                 else:
                     print('Comparing resopnders vs. vectors')
                     df_comp_i = self.fastest_comparisson(Patient.loc[i], subset_vector[i], subset_responder[i], subset_aed[i])
-                    df_duration= pd.concat([df_duration, df_comp_i])
+                    df_duration= pd.concat([df_duration, df_comp_i], ignore_index = True)
         # Returns a data frame.          
         return df_duration
 
