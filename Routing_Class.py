@@ -185,16 +185,16 @@ class route:
         lon_direct = df_duration.iloc[df_duration.idxmin()['duration_direct']]['longitude']
         # longitude of the Responder with the fastest time through an AED
         lon_AED = df_duration.iloc[df_duration.idxmin()['duration_through_AED']]['longitude']
-        # coordinates of the AED with the fastest route
+        # coordinates of the AED with the fastest route - ADAM: What's the point of this line of code?
         subset = df_duration[(df_duration['duration_direct']>df_duration.min()['duration_direct']) & (df_duration['duration_direct']>df_duration.min()['duration_direct'])]
         # Check if the fastest response time with AED is only slightly slower/faster than the direct routing and how different it is
-        # for the second fastest
+        # for the second fastest - ADAM: This doesn't do what it's supposed to
         dif_AED_direct = df_duration.iloc[df_duration.idxmin()['duration_direct']]['duration_through_AED'] - df_duration.min()['duration_direct']
-        # difference between fastest and second fastest direct way
+        # difference between fastest and second fastest direct way - ADAM: This doesn't do what it's supposed to
         dif_2nd_1st_direct = df_duration.iloc[df_duration['duration_direct'].nsmallest(2).index[1]]['duration_direct'] - df_duration.min()['duration_direct']
 
-        # First check if any responder exist that is not furhter away than 600 seconds
-        # DISCUSS
+        # First check if any responder exist that is not furhter away than 600 seconds - ADAM: In the code below it's 1200 seconds.
+        # DISCUSS - ADAM: No else part of this statement. WHat happens else?
         if df_duration[df_duration['duration_direct']<1200].any()['duration_direct'] and df_duration[df_duration['duration_through_AED']<1200].any()['duration_through_AED']:
             # Now check if the fastest through AED is the same as the fastest direct 
             if lat_direct==lat_AED and lon_direct==lon_AED:
