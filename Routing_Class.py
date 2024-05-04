@@ -18,7 +18,7 @@ class route:
 
     # function to find the AEDs and Responders in a 10 minute walking distance from the patient
     # Nearly same as closest Responders
-    def closest_location(self, Patient, Location, profile = "foot-walking", threshold =600):
+    def closest_location(self, Patient, Location, profile = "foot-walking", threshold = 600):
         # patient must be a tuple
         # AEDS must be a dataframe with columns (This is gathered in another file) named latitude and longitude
         # profile by default is walking by foot
@@ -114,13 +114,16 @@ class route:
     # Returns a data frame with the coordinates of the Responder, duration through the specific AED,
     # duration for the direct route, and the coordinates of the used AED
     def possible_routing(self, Patient, Responders, AEDs, threshold = 700):
-        # Check if AEDs exist in the direct circumference (first in 8 minute difference of the patient)
-        t_loc = 480
-        Responders_loc = self.closest_location(Patient, Responders)
-        # if there are less than 3 responders nearby the distance of the isochrone is increased by 2 minutes
-        while len(Responders_loc) < 2:
-            t_loc += 120
+        if len(Responders) < 3:    # If there are less than 3 responders in total (unrealistic case)
+            Responders_loc = self.closest_location(Patient, Responders, threshold=10000)    # Set a high threshold
+        else:
+            # Check if responders exist in the direct circumference (first in 8 minute difference of the patient)
+            t_loc = 480
             Responders_loc = self.closest_location(Patient, Responders, threshold=t_loc)
+            # if there are less than 3 responders nearby the distance of the isochrone is increased by 2 minutes
+            while len(Responders_loc) < 3:
+                t_loc += 120
+                Responders_loc = self.closest_location(Patient, Responders, threshold=t_loc)
         
         # create a data frame based on the coordinates of the close responders
         Responder_df = pd.DataFrame(Responders_loc, columns =['longitude', 'latitude'])
@@ -137,15 +140,19 @@ class route:
         # This is done to minimize the amount the API is used as this is restricted in the free version
         Responder_df['duration_direct']=[self.directions([i, Patient])['duration'] if d<threshold else 5000 for i, d in zip(Responder_df['Responder_loc'], Responder_df['dist_patient'])]
 
-        # Check if AEDsare close by (first in 8 minute difference of the patient)
-        t_AED = 480
-        AED_loc = self.closest_location(Patient, AEDs, threshold=t_AED)
-        while len(AED_loc) < 3:
-            # if there are less than 3 AEDs are nearby the distance of the isochrone is increased by 2 minutes
-            t_AED += 120
+        # Duration through AED
+        if len(AEDs) < 3:    # If there are less than 3 AEDs in total (unrealistic case)
+            AED_loc = self.closest_location(Patient, AEDs, threshold=10000)    # Set a high threshold
+        else:
+            # Check if AEDs are close by (first in 8 minute difference of the patient)
+            t_AED = 480
             AED_loc = self.closest_location(Patient, AEDs, threshold=t_AED)
+            while len(AED_loc) < 3:
+                # if there are less than 3 AEDs nearby the distance of the isochrone is increased by 2 minutes
+                t_AED += 120
+                AED_loc = self.closest_location(Patient, AEDs, threshold=t_AED)
 
-        # Create data frames with the coordinates    
+        # Create data frames with the coordinates
         AED_df = pd.DataFrame(zip(AED_loc), columns =['AED_coordinates'])
         # combine the both data frames
         df_merged = pd.merge(Responder_df.assign(key=1), AED_df.assign(key=1),
