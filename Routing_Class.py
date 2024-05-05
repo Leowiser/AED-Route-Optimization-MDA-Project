@@ -18,7 +18,7 @@ class route:
 
     # function to find the AEDs and Responders in a 10 minute walking distance from the patient
     # Nearly same as closest Responders
-    def closest_location(self, Patient, Location, profile = "foot-walking", threshold =600):
+    def closest_location(self, Patient, Location, profile = "foot-walking", threshold = 600):
         # patient must be a tuple
         # AEDS must be a dataframe with columns (This is gathered in another file) named latitude and longitude
         # profile by default is walking by foot
@@ -88,8 +88,8 @@ class route:
                     metrics=['duration']
                 )
         source = []
-        for i in range(len(matrix["sources"])):
-            source.append([matrix['sources'][i]['location'][0], matrix['sources'][i]['location'][1],float(matrix['durations'][i][0])])
+        for i in range(len(matr["sources"])):
+            source.append([matr['sources'][i]['location'][0], matr['sources'][i]['location'][1],float(matr['durations'][i][0])])
 
         # build a data frame with the duration and the coordinates of the Responder
         df_duration = pd.DataFrame(source, columns = ['longitude', 'latitude', 'duration_direct']) 
@@ -116,7 +116,7 @@ class route:
     def possible_routing(self, Patient, Responders, AEDs, threshold = 700):
         if len(Responders) < 3:    # If there are less than 3 responders in total (unrealistic case)
             Responders_loc = self.closest_location(Patient, Responders, threshold=10000)    # Set a high threshold
-        else:            
+        else:
             # Check if responders exist in the direct circumference (first in 8 minute difference of the patient)
             t_loc = 480
             Responders_loc = self.closest_location(Patient, Responders, threshold=t_loc)
@@ -144,11 +144,11 @@ class route:
         if len(AEDs) < 3:    # If there are less than 3 AEDs in total (unrealistic case)
             AED_loc = self.closest_location(Patient, AEDs, threshold=10000)    # Set a high threshold
         else:
-            # Check if AEDsare close by (first in 8 minute difference of the patient)
+            # Check if AEDs are close by (first in 8 minute difference of the patient)
             t_AED = 480
             AED_loc = self.closest_location(Patient, AEDs, threshold=t_AED)
             while len(AED_loc) < 3:
-                # if there are less than 3 AEDs are nearby the distance of the isochrone is increased by 2 minutes
+                # if there are less than 3 AEDs nearby the distance of the isochrone is increased by 2 minutes
                 t_AED += 120
                 AED_loc = self.closest_location(Patient, AEDs, threshold=t_AED)
 
@@ -185,16 +185,16 @@ class route:
         lon_direct = df_duration.iloc[df_duration.idxmin()['duration_direct']]['longitude']
         # longitude of the Responder with the fastest time through an AED
         lon_AED = df_duration.iloc[df_duration.idxmin()['duration_through_AED']]['longitude']
-        # coordinates of the AED with the fastest route - ADAM: What's the point of this line of code?
+        # coordinates of the AED with the fastest route
         subset = df_duration[(df_duration['duration_direct']>df_duration.min()['duration_direct']) & (df_duration['duration_direct']>df_duration.min()['duration_direct'])]
         # Check if the fastest response time with AED is only slightly slower/faster than the direct routing and how different it is
-        # for the second fastest - ADAM: This doesn't do what it's supposed to
+        # for the second fastest
         dif_AED_direct = df_duration.iloc[df_duration.idxmin()['duration_direct']]['duration_through_AED'] - df_duration.min()['duration_direct']
-        # difference between fastest and second fastest direct way - ADAM: This doesn't do what it's supposed to
+        # difference between fastest and second fastest direct way
         dif_2nd_1st_direct = df_duration.iloc[df_duration['duration_direct'].nsmallest(2).index[1]]['duration_direct'] - df_duration.min()['duration_direct']
 
-        # First check if any responder exist that is not furhter away than 600 seconds - ADAM: In the code below it's 1200 seconds.
-        # DISCUSS - ADAM: No else part of this statement. WHat happens else?
+        # First check if any responder exist that is not furhter away than 600 seconds
+        # DISCUSS
         if df_duration[df_duration['duration_direct']<1200].any()['duration_direct'] and df_duration[df_duration['duration_through_AED']<1200].any()['duration_through_AED']:
             # Now check if the fastest through AED is the same as the fastest direct 
             if lat_direct==lat_AED and lon_direct==lon_AED:
