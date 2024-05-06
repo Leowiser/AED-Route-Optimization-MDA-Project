@@ -182,7 +182,7 @@ class route:
         subset = df_duration[(df_duration['duration_direct']>df_duration.min()['duration_direct']) & (df_duration['duration_direct']>df_duration.min()['duration_direct'])]
         # Check if the fastest response time with AED is only slightly slower/faster than the direct routing and how different it is
         # for the second fastest
-        dif_AED_direct = df_duration.iloc[df_duration.idxmin()['duration_direct']]['duration_through_AED'] - df_duration.min()['duration_direct']
+        dif_AED_direct = df_duration[df_duration['duration_direct']==df_duration.min()['duration_direct']].min()['duration_through_AED'] - df_duration.min()['duration_direct']
         # difference between fastest and second fastest direct way
         dif_2nd_1st_direct = df_duration.iloc[df_duration.drop_duplicates(subset=['Responder_loc']).nsmallest(2,'duration_direct').index[1]]['duration_direct'] - df_duration.min()['duration_direct']
 
