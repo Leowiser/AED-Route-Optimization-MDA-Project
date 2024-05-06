@@ -56,6 +56,6 @@ class FR_Generation:
         frs = pop_gdf["fr_loc"].explode()
         # getting the fr locs in coordinate form, in order to calculate the taxicab metric
         fr_coords=frs.get_coordinates()
-        print("There are " + str(len(fr_coords)) + "First Responders in the municipality")
+        print("There are " + str(len(fr_coords)) + " First Responders in the municipality")
         return fr_coords
     
