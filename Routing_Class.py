@@ -301,5 +301,6 @@ class route:
         fig.update_traces(line=dict(color='orange', width = 4), selector=1)
         fig.update_layout(mapbox_style="carto-positron", mapbox_zoom=14, mapbox_center_lat=df_latlong_direct['lat'].iloc[0],
                           margin={"r": 0, "t": 0, "l": 0, "b": 0})
-        fig.show()
+        
+        return fig
     
