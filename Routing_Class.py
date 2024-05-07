@@ -105,9 +105,16 @@ class route:
                                    format='geojson',
                                    validate=False)
         route_dict = {}
-        route_dict['duration'] = route.get('features')[0]['properties']['summary']['duration']
-        route_dict['route'] = route
-        route_dict['coordinates'] = route.get('features')[0]['geometry']['coordinates']
+        # check if all coordinates are the same
+        # If so duration would be empty thus it is set to 0
+        if coordinates.count(coordinates[0]) == len(coordinates):
+            route_dict['duration'] = 0
+            route_dict['route'] = route
+            route_dict['coordinates'] = route.get('features')[0]['geometry']['coordinates']
+        else:
+            route_dict['duration'] = route.get('features')[0]['properties']['summary']['duration']
+            route_dict['route'] = route
+            route_dict['coordinates'] = route.get('features')[0]['geometry']['coordinates']
         return route_dict
     
     # Function to get all possible routes through the AEDs that are close to the patient
