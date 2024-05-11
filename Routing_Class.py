@@ -189,9 +189,9 @@ class route:
         subset = df_duration[(df_duration['duration_direct']>df_duration.min()['duration_direct']) & (df_duration['duration_direct']>df_duration.min()['duration_direct'])]
         # Check if the fastest response time with AED is only slightly slower/faster than the direct routing and how different it is
         # for the second fastest
-        dif_AED_direct = df_duration.iloc[df_duration.idxmin()['duration_direct']]['duration_through_AED'] - df_duration.min()['duration_direct']
+        dif_AED_direct = df_duration[df_duration['duration_direct']==df_duration.min()['duration_direct']].min()['duration_through_AED'] - df_duration.min()['duration_direct']
         # difference between fastest and second fastest direct way
-        dif_2nd_1st_direct = df_duration.iloc[df_duration['duration_direct'].nsmallest(2).index[1]]['duration_direct'] - df_duration.min()['duration_direct']
+        dif_2nd_1st_direct = df_duration.iloc[df_duration.drop_duplicates(subset=['Responder_loc']).nsmallest(2,'duration_direct').index[1]]['duration_direct'] - df_duration.min()['duration_direct']
 
         # First check if any responder exist that is not furhter away than 600 seconds
         # DISCUSS
@@ -205,7 +205,7 @@ class route:
                     # If both is true:
                     # - Second fastest direct time will be send directly
                     # - Fastest direct and AED responder will be send through the AED
-                    coord_direct = (df_duration.iloc[df_duration['duration_direct'].nsmallest(2).index[1]]['longitude'], df_duration.iloc[df_duration['duration_direct'].nsmallest(2).index[1]]['latitude'])
+                    coord_direct = (df_duration.iloc[df_duration.drop_duplicates(subset=['Responder_loc']).nsmallest(2,'duration_direct').index[1]]['longitude'], df_duration.iloc[df_duration.drop_duplicates(subset=['Responder_loc']).nsmallest(2,'duration_direct').index[1]]['latitude'])
                     coord_AED =  (lon_direct, lat_direct)
                     AED_coordinates = df_duration.iloc[df_duration.idxmin()['duration_direct']]['AED_coordinates']
                 # If this is not true:
