@@ -224,6 +224,9 @@ class route:
                 coord_AED = (lon_AED, lat_AED)
                 AED_coordinates = df_duration.iloc[df_duration.idxmin()['duration_through_AED']]['AED_coordinates']
 
+        return {'coord_direct': coord_direct, 'coord_AED': coord_AED, 'AED_coordinates': AED_coordinates}
+    
+        """
         # Get both routes
         direct_route = self.directions([coord_direct, Patient])
         AED_route = self.directions([coord_AED, AED_coordinates, Patient])
@@ -232,10 +235,7 @@ class route:
         # To transform the route into usable data frame for plotting with the get_coordinates function
         df_latlong_direct = self.get_coordinates(direct_route['coordinates'])
         df_latlong_AED = self.get_coordinates(AED_route['coordinates'])
-
-        return {'df_latlong_direct': df_latlong_direct, 'df_latlong_AED': df_latlong_AED}
     
-        """
         # plot the direct way
         fig = px.line_mapbox(df_latlong_direct, lat="lat", lon="lon", zoom=3, height=300)
         # Add the route through the AED
