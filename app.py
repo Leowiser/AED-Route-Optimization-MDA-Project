@@ -31,42 +31,48 @@ fig.update_layout(
 )
 
 
-# Currency Options
-latitude_slider = dcc.Slider(
-    id='latitude_slider',
-    min = lat-0.01,
-    max = lat+0.01,
-    value = lat,
-    step = 0.0005,
-    vertical = False)
+# lat-long user inputs
+latitude_input = dcc.Input(
+    id='latitude_input',
+    type='number',
+    value=lat,
+    step = 0.0001,
+    debounce = True,
+    style={'width': '100%'}
+)
 
-longitude_slider = dcc.Slider(
-    id='longitude_slider',
-    min = lon-0.01,
-    max = lon+0.01,
-    value = lon,
-    step = 0.0005,
-    vertical = False)
-
-
+longitude_input = dcc.Input(
+    id='longitude_input',
+    type='number',
+    value=lon,
+    step = 0.0001,
+    debounce = True,
+    style={'width': '100%'}
+)
 
 
 app.layout = dbc.Container(
     [
-        html.Div(children=[html.H1(children='AED & Responder route optimization'),
-                           html.H2(children='...', id='id_title')],
-                 style={'textAlign':'center','color':'black'}),
+        html.Div(
+            children=[
+                html.H1(children='AED & Responder route optimization'),
+                html.H2(children='...', id='id_title')
+            ],
+            style={'textAlign': 'center', 'color': 'black'}
+        ),
         html.Hr(),
         dbc.Row(
             [
                 dbc.Col(
                     [
-                        dbc.Row(latitude_slider),
-                        dbc.Row(longitude_slider),
+                        dbc.Row(html.Label("Patient latitude")),
+                        dbc.Row(latitude_input),
+                        dbc.Row(html.Label("Patient longitude")),
+                        dbc.Row(longitude_input)
                     ],
-                    md = 2
+                    md=2
                 ),
-                dbc.Col(dcc.Graph(id="id_graph",figure=fig), md = 10),
+                dbc.Col(dcc.Graph(id="id_graph", figure=fig), md=10),
             ],
             align="center",
         ),
@@ -77,8 +83,8 @@ app.layout = dbc.Container(
 @app.callback(
     Output('id_title','children'),
     Output('id_graph','figure'),
-    [Input('latitude_slider', 'value'),
-     Input('longitude_slider','value')
+    [Input('latitude_input', 'value'),
+     Input('longitude_input','value')
      ]
 )
 
