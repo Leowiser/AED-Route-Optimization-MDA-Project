@@ -231,10 +231,14 @@ class route:
         # Get a dataframe of the description of the route for plotting
         # To transform the route into usable data frame for plotting with the get_coordinates function
         df_latlong_direct = self.get_coordinates(direct_route['coordinates'])
-        df_latlong_AED = self.get_coordinates(AED_route['coordinates'])      
+        df_latlong_AED = self.get_coordinates(AED_route['coordinates'])
+
+        # plot the AEDs
+        fig = px.scatter_mapbox(AEDs, lat="latitude", lon="longitude", zoom=3, height=300, color_discrete_sequence=["green"])
+        fig.update_traces(marker=dict(size=7)) 
 
         # plot the direct way
-        fig = px.line_mapbox(df_latlong_direct, lat="lat", lon="lon", zoom=3, height=300)
+        fig.add_trace(px.line_mapbox(df_latlong_direct, lat="lat", lon="lon").data[0])
         # Add the route through the AED
         fig.add_trace(px.line_mapbox(df_latlong_AED, lat='lat', lon='lon').data[0]) 
             
@@ -297,9 +301,9 @@ class route:
         fig.add_trace(AED_marker)
         
         # Color the direct responder in darkblue and the one through the AED in orange
-        fig.update_traces(line=dict(color='darkblue', width = 4), selector=0)
-        fig.update_traces(line=dict(color='orange', width = 4), selector=1)
+        fig.update_traces(line=dict(color='orange', width = 4), selector=2)
+        fig.update_traces(line=dict(color='darkblue', width = 4), selector=1)
         fig.update_layout(mapbox_style="carto-positron", mapbox_zoom=14, mapbox_center_lat=df_latlong_direct['lat'].iloc[0],
                           margin={"r": 0, "t": 0, "l": 0, "b": 0})
-        fig.show()
+        return fig
     
