@@ -231,10 +231,14 @@ class route:
         # Get a dataframe of the description of the route for plotting
         # To transform the route into usable data frame for plotting with the get_coordinates function
         df_latlong_direct = self.get_coordinates(direct_route['coordinates'])
-        df_latlong_AED = self.get_coordinates(AED_route['coordinates'])      
+        df_latlong_AED = self.get_coordinates(AED_route['coordinates'])
+
+        # plot the AEDs
+        fig = px.scatter_mapbox(aed, lat="latitude", lon="longitude", zoom=3, height=300, color_discrete_sequence=["green"])
+        fig.update_traces(marker=dict(size=8)) 
 
         # plot the direct way
-        fig = px.line_mapbox(df_latlong_direct, lat="lat", lon="lon", zoom=3, height=300)
+        fig.add_trace(px.line_mapbox(df_latlong_direct, lat="lat", lon="lon").data[0])
         # Add the route through the AED
         fig.add_trace(px.line_mapbox(df_latlong_AED, lat='lat', lon='lon').data[0]) 
             
