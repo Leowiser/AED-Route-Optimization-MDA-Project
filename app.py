@@ -4,10 +4,28 @@ from dash import dcc
 import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
 import numpy as np
+import pandas as pd
 from dash.dependencies import Input, Output
-
+from Routing_Class import route
 
 app = dash.Dash(__name__,title='Zambia MDA Project', external_stylesheets=[dbc.themes.BOOTSTRAP])
+
+test = route()
+
+# Generate 40 random lat and long
+N=40
+lon_resp = np.random.uniform(4.69,4.71,N)
+lat_resp = np.random.uniform(50.85,50.88,N)
+
+# Create dataframe from the numpy arrays
+responder = pd.DataFrame({'longitude':lon_resp, 'latitude':lat_resp})
+
+N=10
+lon_aed = np.random.uniform(4.69,4.71,N)
+lat_aed = np.random.uniform(50.85,50.88,N)
+
+# Create geodataframe from numpy arrays
+aed = pd.DataFrame({'longitude':lon_aed, 'latitude':lat_aed})
 
 # Coordinates of Leuven, Belgium
 lat = 50.8798
