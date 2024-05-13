@@ -234,7 +234,7 @@ class route:
         df_latlong_AED = self.get_coordinates(AED_route['coordinates'])
 
         # plot the AEDs
-        fig = px.scatter_mapbox(aed, lat="latitude", lon="longitude", zoom=3, height=300, color_discrete_sequence=["green"])
+        fig = px.scatter_mapbox(AEDs, lat="latitude", lon="longitude", zoom=3, height=300, color_discrete_sequence=["green"])
         fig.update_traces(marker=dict(size=8)) 
 
         # plot the direct way
