@@ -233,7 +233,7 @@ class route:
         df_latlong_direct = self.get_coordinates(direct_route['coordinates'])
         df_latlong_AED = self.get_coordinates(AED_route['coordinates'])
 
-        return df_latlong_direct, df_latlong_AED
+        return {'df_latlong_direct': df_latlong_direct, 'df_latlong_AED': df_latlong_AED}
     
         """
         # plot the direct way
