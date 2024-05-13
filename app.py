@@ -7,10 +7,9 @@ import numpy as np
 import pandas as pd
 from dash.dependencies import Input, Output
 from Routing_Class import route
+import plotly.express as px
 
 app = dash.Dash(__name__,title='Zambia MDA Project', external_stylesheets=[dbc.themes.BOOTSTRAP])
-
-test = route()
 
 # Generate 40 random lat and long
 N=40
@@ -31,6 +30,7 @@ aed = pd.DataFrame({'longitude':lon_aed, 'latitude':lat_aed})
 lat = 50.8798
 lon = 4.7005
 
+
 # Create a map figure
 fig = go.Figure(go.Scattermapbox(
     lat=[lat],
@@ -40,12 +40,14 @@ fig = go.Figure(go.Scattermapbox(
         size=14
     ),
 ))
+# fig = px.line_mapbox(lat=[lat], lon=[lon])
 
 # Update layout to use mapbox style and set initial zoom level
 fig.update_layout(
-    mapbox_style="open-street-map",
+    mapbox_style="carto-positron",
     mapbox_center={"lat": lat, "lon": lon},
-    mapbox_zoom=12
+    mapbox_zoom=14,
+    margin={"r": 0, "t": 0, "l": 0, "b": 0}
 )
 
 
@@ -108,6 +110,8 @@ app.layout = dbc.Container(
 
 def update_chart(latitude_value, longitude_value):
     updated_fig = fig.update_traces(lat=[latitude_value], lon=[longitude_value])
+    # test = route()
+    # updated_fig = fig.update_traces(test.send_responders((longitude_value, latitude_value), responder, aed))
     return 'Coordinates of the patient (latitude, longitude): (' + str(latitude_value) + ',' + str(longitude_value) +')', updated_fig
 
 if __name__ == '__main__':
