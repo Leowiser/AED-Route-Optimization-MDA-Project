@@ -113,7 +113,7 @@ class route:
     # Function to get all possible routes through the AEDs that are close to the patient
     # Returns a data frame with the coordinates of the Responder, duration through the specific AED,
     # duration for the direct route, and the coordinates of the used AED
-    def possible_routing(self, Patient, Responders, AEDs, threshold = 700):
+    def possible_routing(self, Patient, Responders, AEDs, threshold = 600):
         if len(Responders) < 3:    # If there are less than 3 responders in total (unrealistic case)
             Responders_loc = self.closest_location(Patient, Responders, threshold=10000)    # Set a high threshold
         else:
@@ -135,10 +135,14 @@ class route:
         Responder_df['Patient_loc'] = list(zip(Responder_df['Patient_lon'],Responder_df['Patient_lat']))
         # get the distance between responders and patients
         Responder_df['dist_patient'] = Responder_df.apply(lambda row: geopy.distance.distance(row['Responder_loc'], row['Patient_loc']).meters, axis=1)
+        # only keep the 10 closest vectors. keep='all' so that more that all responders with the 10 lowest values are kept.
+        Responder_df = Responder_df.nsmallest(5, 'dist_patient', keep='all')
+        Responder_df['duration']=[self.directions([i, Patient_cood], profile = 'driving-car')['duration'] for i, 
+                                          Patient_cood in zip(Responder_df['Vector_loc'], Responder_df['Patient_loc'])]
         # if the distance is lower than the threshold (default is 700 meters), the foot walking distance is calculated and otherwise the value
         # is set to a high value.
         # This is done to minimize the amount the API is used as this is restricted in the free version
-        Responder_df['duration_direct']=[self.directions([i, Patient])['duration'] if d<threshold else 5000 for i, d in zip(Responder_df['Responder_loc'], Responder_df['dist_patient'])]
+        # Responder_df['duration_direct']=[self.directions([i, Patient])['duration'] if d<threshold else 5000 for i, d in zip(Responder_df['Responder_loc'], Responder_df['dist_patient'])]
 
         # Duration through AED
         if len(AEDs) < 3:    # If there are less than 3 AEDs in total (unrealistic case)
