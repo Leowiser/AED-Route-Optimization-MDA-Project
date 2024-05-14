@@ -56,7 +56,8 @@ fig.update_layout(
     mapbox_center={"lat": lat, "lon": lon},
     mapbox_zoom=13,
     height=500,
-    margin={"r": 0, "t": 0, "l": 0, "b": 0}
+    margin={"r": 0, "t": 0, "l": 0, "b": 0},
+    legend = dict(orientation = 'h', yanchor = 'bottom')
 )
 
 # lat-long user inputs
@@ -84,7 +85,7 @@ app.layout = dbc.Container(
         html.Div(
             children=[
                 html.H1(children='AED & Responder route optimization'),
-                html.H2(children='...', id='id_title')
+                html.H2(children='Please wait while the figure updates...', id='id_title')
             ],
             style={'textAlign': 'center', 'color': 'black'}
         ),
@@ -116,9 +117,8 @@ app.layout = dbc.Container(
      ]
 )
 def update_chart(latitude_value, longitude_value):
-    resp = responder.copy()
-    aeds = aed.copy()
-    best_coordinates = route.send_responders((longitude_value, latitude_value), resp, aeds)
+    # Get coordinates of the optimal first-and second responder's and AED's location
+    best_coordinates = route.send_responders((longitude_value, latitude_value), responder, aed)
     coord_direct = best_coordinates['coord_direct']
     coord_AED = best_coordinates['coord_AED']
     AED_coordinates = best_coordinates['AED_coordinates']
@@ -132,11 +132,13 @@ def update_chart(latitude_value, longitude_value):
     df_latlong_direct = route.get_coordinates(direct_route['coordinates'])
     df_latlong_AED = route.get_coordinates(AED_route['coordinates'])
 
+    # "Reset" the plot to keep only the AED locations
+    fig.data = [fig.data[0]]
+    # Plot the new patient location (after user changed input)
     updated_fig = fig.update_traces(lat=[latitude_value], lon=[longitude_value], selector=dict(name='Patient'))
     updated_fig.update_layout(mapbox_center={"lat": latitude_value, "lon": longitude_value})    # center plot around the new coordinates
 
-    # plot the direct way
-    # plot the direct way
+    # plot the direct way - first responder to patient
     direct_trace = px.line_mapbox(df_latlong_direct, lat="lat", lon="lon").data[0]
     direct_trace.line.width = 4
     direct_trace.line.color = 'darkblue'
@@ -147,11 +149,12 @@ def update_chart(latitude_value, longitude_value):
     AED_trace.line.color = 'orange'
     updated_fig.add_trace(AED_trace)
 
-    # Add marker for the first responders initial location
+    # Add marker for the first responder's initial location
     beginning_direct = go.Scattermapbox(
     lat=[df_latlong_direct['lat'].iloc[0]],
     lon=[df_latlong_direct['lon'].iloc[0]],
     mode='markers',
+    name = 'Route of first responder',
     marker=go.scattermapbox.Marker(
         size=10,
         color='darkblue'
@@ -165,6 +168,7 @@ def update_chart(latitude_value, longitude_value):
     lat=[df_latlong_AED['lat'].iloc[0]],
     lon=[df_latlong_AED['lon'].iloc[0]],
     mode='markers',
+    name = 'Route of responder through AED',
     marker=go.scattermapbox.Marker(
         size=10,
         color='orange'
@@ -178,6 +182,7 @@ def update_chart(latitude_value, longitude_value):
     lat=[df_latlong_AED['lat'].iloc[-1]],
     lon=[df_latlong_AED['lon'].iloc[-1]],
     mode='markers',
+    name = 'Patient',
     marker=go.scattermapbox.Marker(
         size=15,
         color='red'
@@ -191,6 +196,7 @@ def update_chart(latitude_value, longitude_value):
     lat=[AED_coordinates[1]],
     lon=[AED_coordinates[0]],
     mode='markers',
+    name = 'AED',
     marker=go.scattermapbox.Marker(
         size=15,
         color='green'
