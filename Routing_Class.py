@@ -224,7 +224,7 @@ class route:
                 coord_AED = (lon_AED, lat_AED)
                 AED_coordinates = df_duration.iloc[df_duration.idxmin()['duration_through_AED']]['AED_coordinates']
         
-        return {'coord_direct': coord_direct, 'coord_AED': coord_AED, 'AED_coordinates':AED_coordinates}
+        return {'coord_direct': coord_direct}
     
         '''
         # Get both routes

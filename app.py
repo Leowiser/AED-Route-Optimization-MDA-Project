@@ -5,10 +5,13 @@ import plotly.graph_objects as go
 import numpy as np
 import pandas as pd
 from dash.dependencies import Input, Output
-from Routing_Class import route
 import plotly.express as px
+from Routing_Class import route
+
 
 app = dash.Dash(__name__, title='Zambia MDA Project', external_stylesheets=[dbc.themes.BOOTSTRAP])
+
+route = route()
 
 # Generate 40 random lat and long for responders
 N = 40
@@ -113,8 +116,25 @@ app.layout = dbc.Container(
      ]
 )
 def update_chart(latitude_value, longitude_value):
+    #best_coordinates = route.send_responders((longitude_value, latitude_value), responder, aed)
+    #coord_AED = best_coordinates['coord_AED']
+    #AED_coordinates = best_coordinates['AED_coordinates']
+
+    # Get both routes
+    #direct_route = route.directions([coord_direct, (longitude_value, latitude_value)])
+    # AED_route = route.directions([coord_AED, AED_coordinates, (longitude_value, latitude_value)])
+
+    # Get a dataframe of the description of the route for plotting
+    # To transform the route into usable data frame for plotting with the get_coordinates function
+    # df_latlong_direct = route.get_coordinates(direct_route['coordinates'])
+    #df_latlong_AED = route.get_coordinates(AED_route['coordinates'])
+
     updated_fig = fig.update_traces(lat=[latitude_value], lon=[longitude_value], selector=dict(name='Patient'))
     updated_fig.update_layout(mapbox_center={"lat": latitude_value, "lon": longitude_value})    # center plot around the new coordinates
+
+     # plot the direct way
+    #updated_fig.add_trace(px.line_mapbox(df_latlong_direct, lat="lat", lon="lon").data[0])
+
     return 'Coordinates of the patient (latitude, longitude): (' + str(latitude_value) + ',' + str(longitude_value) +')', updated_fig
 
 if __name__ == '__main__':
