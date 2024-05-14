@@ -135,7 +135,7 @@ class route:
         Responder_df['Patient_loc'] = list(zip(Responder_df['Patient_lon'],Responder_df['Patient_lat']))
         # get the distance between responders and patients
         Responder_df['dist_patient'] = Responder_df.apply(lambda row: geopy.distance.distance(row['Responder_loc'], row['Patient_loc']).meters, axis=1)
-        # only keep the 10 closest vectors. keep='all' so that more that all responders with the 10 lowest values are kept.
+        # only keep the 5 closest responders. keep='all' so that more that all responders with the 5 lowest values are kept.
         Responder_df = Responder_df.nsmallest(5, 'dist_patient', keep='all')
         Responder_df['duration_direct']=[self.directions([i, Patient_cood], profile = 'foot-walking')['duration'] for i, 
                                           Patient_cood in zip(Responder_df['Responder_loc'], Responder_df['Patient_loc'])]
@@ -228,7 +228,7 @@ class route:
                 coord_AED = (lon_AED, lat_AED)
                 AED_coordinates = df_duration.iloc[df_duration.idxmin()['duration_through_AED']]['AED_coordinates']
         
-        return {'coord_direct': coord_direct}
+        return {'coord_direct': coord_direct, 'coord_AED': coord_AED, 'AED_coordinates': AED_coordinates}
     
         '''
         # Get both routes
