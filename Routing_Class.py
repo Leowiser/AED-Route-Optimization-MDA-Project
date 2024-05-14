@@ -223,7 +223,10 @@ class route:
                 coord_direct = (lon_direct, lat_direct)
                 coord_AED = (lon_AED, lat_AED)
                 AED_coordinates = df_duration.iloc[df_duration.idxmin()['duration_through_AED']]['AED_coordinates']
-
+        
+        return {'coord_direct': coord_direct, 'coord_AED': coord_AED, 'AED_coordinates':AED_coordinates}
+    
+        '''
         # Get both routes
         direct_route = self.directions([coord_direct, Patient])
         AED_route = self.directions([coord_AED, AED_coordinates, Patient])
@@ -306,4 +309,4 @@ class route:
         fig.update_layout(mapbox_style="carto-positron", mapbox_zoom=14, mapbox_center_lat=df_latlong_direct['lat'].iloc[0],
                           margin={"r": 0, "t": 0, "l": 0, "b": 0})
         return fig
-    
+        '''

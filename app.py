@@ -33,17 +33,6 @@ lon = 4.7005
 # Create a map figure
 fig = px.scatter_mapbox(aed, lat="latitude", lon="longitude", color_discrete_sequence=["green"])
 fig.update_traces(marker=dict(size=7))
-'''
-# Create a map figure
-fig = go.Figure(go.Scattermapbox(
-    lat=[lat],
-    lon=[lon],
-    mode='markers',
-    marker=go.scattermapbox.Marker(
-        size=14
-    ),
-))
-'''
 
 fig.add_trace(go.Scattermapbox(
     lat=[lat],
@@ -57,9 +46,6 @@ fig.add_trace(go.Scattermapbox(
     ),
     name='Patient'  # Name of the new point for legend
 ))
-
-# fig = px.scatter_mapbox(aed, lat="latitude", lon="longitude", zoom=3, height=300, color_discrete_sequence=["green"])
-# fig.update_traces(marker=dict(size=7))
 
 # Update layout to use mapbox style and set initial zoom level
 fig.update_layout(
@@ -129,8 +115,6 @@ app.layout = dbc.Container(
 def update_chart(latitude_value, longitude_value):
     updated_fig = fig.update_traces(lat=[latitude_value], lon=[longitude_value], selector=dict(name='Patient'))
     updated_fig.update_layout(mapbox_center={"lat": latitude_value, "lon": longitude_value})    # center plot around the new coordinates
-    # test = route()
-    # updated_fig = fig.update_traces(test.send_responders((longitude_value, latitude_value), responder, aed))
     return 'Coordinates of the patient (latitude, longitude): (' + str(latitude_value) + ',' + str(longitude_value) +')', updated_fig
 
 if __name__ == '__main__':
