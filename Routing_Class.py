@@ -137,7 +137,7 @@ class route:
         Responder_df['dist_patient'] = Responder_df.apply(lambda row: geopy.distance.distance(row['Responder_loc'], row['Patient_loc']).meters, axis=1)
         # only keep the 10 closest vectors. keep='all' so that more that all responders with the 10 lowest values are kept.
         Responder_df = Responder_df.nsmallest(5, 'dist_patient', keep='all')
-        Responder_df['duration']=[self.directions([i, Patient_cood], profile = 'foot-walking')['duration'] for i, 
+        Responder_df['duration_direct']=[self.directions([i, Patient_cood], profile = 'foot-walking')['duration'] for i, 
                                           Patient_cood in zip(Responder_df['Responder_loc'], Responder_df['Patient_loc'])]
         # if the distance is lower than the threshold (default is 700 meters), the foot walking distance is calculated and otherwise the value
         # is set to a high value.
