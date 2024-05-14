@@ -120,23 +120,90 @@ def update_chart(latitude_value, longitude_value):
     aeds = aed.copy()
     best_coordinates = route.send_responders((longitude_value, latitude_value), resp, aeds)
     coord_direct = best_coordinates['coord_direct']
-    #coord_AED = best_coordinates['coord_AED']
-    #AED_coordinates = best_coordinates['AED_coordinates']
+    coord_AED = best_coordinates['coord_AED']
+    AED_coordinates = best_coordinates['AED_coordinates']
 
     # Get both routes
     direct_route = route.directions([coord_direct, (longitude_value, latitude_value)])
-    # AED_route = route.directions([coord_AED, AED_coordinates, (longitude_value, latitude_value)])
+    AED_route = route.directions([coord_AED, AED_coordinates, (longitude_value, latitude_value)])
 
     # Get a dataframe of the description of the route for plotting
     # To transform the route into usable data frame for plotting with the get_coordinates function
     df_latlong_direct = route.get_coordinates(direct_route['coordinates'])
-    #df_latlong_AED = route.get_coordinates(AED_route['coordinates'])
+    df_latlong_AED = route.get_coordinates(AED_route['coordinates'])
 
     updated_fig = fig.update_traces(lat=[latitude_value], lon=[longitude_value], selector=dict(name='Patient'))
     updated_fig.update_layout(mapbox_center={"lat": latitude_value, "lon": longitude_value})    # center plot around the new coordinates
 
-     # plot the direct way
-    updated_fig.add_trace(px.line_mapbox(df_latlong_direct, lat="lat", lon="lon").data[0])
+    # plot the direct way
+    # plot the direct way
+    direct_trace = px.line_mapbox(df_latlong_direct, lat="lat", lon="lon").data[0]
+    direct_trace.line.width = 4
+    direct_trace.line.color = 'darkblue'
+    updated_fig.add_trace(direct_trace)
+    # Add the route through the AED
+    AED_trace = px.line_mapbox(df_latlong_AED, lat='lat', lon='lon').data[0]
+    AED_trace.line.width = 4
+    AED_trace.line.color = 'orange'
+    updated_fig.add_trace(AED_trace)
+
+    # Add marker for the first responders initial location
+    beginning_direct = go.Scattermapbox(
+    lat=[df_latlong_direct['lat'].iloc[0]],
+    lon=[df_latlong_direct['lon'].iloc[0]],
+    mode='markers',
+    marker=go.scattermapbox.Marker(
+        size=10,
+        color='darkblue'
+    ),
+    text='First responder direct',  # Text to display when hovering over the marker
+    hoverinfo='text'
+    )
+
+    # Add markers for the first responder that takes the route through the AED
+    beginning_AED = go.Scattermapbox(
+    lat=[df_latlong_AED['lat'].iloc[0]],
+    lon=[df_latlong_AED['lon'].iloc[0]],
+    mode='markers',
+    marker=go.scattermapbox.Marker(
+        size=10,
+        color='orange'
+    ),
+    text='Start responder through AED',
+    hoverinfo='text'
+    )
+
+    # Add marker for the Patient
+    Patient = go.Scattermapbox(
+    lat=[df_latlong_AED['lat'].iloc[-1]],
+    lon=[df_latlong_AED['lon'].iloc[-1]],
+    mode='markers',
+    marker=go.scattermapbox.Marker(
+        size=15,
+        color='red'
+    ),
+    text='Patient',
+    hoverinfo='text' 
+    )
+
+    # Add a marker for the AED
+    AED_marker = go.Scattermapbox(
+    lat=[AED_coordinates[1]],
+    lon=[AED_coordinates[0]],
+    mode='markers',
+    marker=go.scattermapbox.Marker(
+        size=15,
+        color='green'
+    ),
+    text='AED device',
+    hoverinfo='text'
+    )
+
+    # Add the markers to the figure
+    updated_fig.add_trace(beginning_direct)
+    updated_fig.add_trace(beginning_AED)
+    updated_fig.add_trace(Patient)
+    updated_fig.add_trace(AED_marker)
 
     return 'Coordinates of the patient (latitude, longitude): (' + str(latitude_value) + ',' + str(longitude_value) +')', updated_fig
 
