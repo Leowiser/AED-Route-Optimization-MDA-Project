@@ -14,7 +14,7 @@ import plotly.graph_objects as go
 
 class route:
     def __init__(self):
-        self.Client_ors = openrouteservice.Client(key='5b3ce3597851110001cf624802e069d6633748a5ae4e9842334f1dc2')
+        self.Client_ors = openrouteservice.Client(key='5b3ce3597851110001cf6248a8348d6a74544602bd7cbc7936c635d1')
 
     # function to find the AEDs and Responders in a 10 minute walking distance from the patient
     # Nearly same as closest Responders
@@ -113,7 +113,7 @@ class route:
     # Function to get all possible routes through the AEDs that are close to the patient
     # Returns a data frame with the coordinates of the Responder, duration through the specific AED,
     # duration for the direct route, and the coordinates of the used AED
-    def possible_routing(self, Patient, Responders, AEDs, threshold = 700):
+    def possible_routing(self, Patient, Responders, AEDs, threshold = 600):
         if len(Responders) < 3:    # If there are less than 3 responders in total (unrealistic case)
             Responders_loc = self.closest_location(Patient, Responders, threshold=10000)    # Set a high threshold
         else:
@@ -135,10 +135,14 @@ class route:
         Responder_df['Patient_loc'] = list(zip(Responder_df['Patient_lon'],Responder_df['Patient_lat']))
         # get the distance between responders and patients
         Responder_df['dist_patient'] = Responder_df.apply(lambda row: geopy.distance.distance(row['Responder_loc'], row['Patient_loc']).meters, axis=1)
+        # only keep the 5 closest responders. keep='all' so that more that all responders with the 5 lowest values are kept.
+        Responder_df = Responder_df.nsmallest(5, 'dist_patient', keep='all')
+        Responder_df['duration_direct']=[self.directions([i, Patient_cood], profile = 'foot-walking')['duration'] for i, 
+                                          Patient_cood in zip(Responder_df['Responder_loc'], Responder_df['Patient_loc'])]
         # if the distance is lower than the threshold (default is 700 meters), the foot walking distance is calculated and otherwise the value
         # is set to a high value.
         # This is done to minimize the amount the API is used as this is restricted in the free version
-        Responder_df['duration_direct']=[self.directions([i, Patient])['duration'] if d<threshold else 5000 for i, d in zip(Responder_df['Responder_loc'], Responder_df['dist_patient'])]
+        # Responder_df['duration_direct']=[self.directions([i, Patient])['duration'] if d<threshold else 5000 for i, d in zip(Responder_df['Responder_loc'], Responder_df['dist_patient'])]
 
         # Duration through AED
         if len(AEDs) < 3:    # If there are less than 3 AEDs in total (unrealistic case)
@@ -189,9 +193,9 @@ class route:
         subset = df_duration[(df_duration['duration_direct']>df_duration.min()['duration_direct']) & (df_duration['duration_direct']>df_duration.min()['duration_direct'])]
         # Check if the fastest response time with AED is only slightly slower/faster than the direct routing and how different it is
         # for the second fastest
-        dif_AED_direct = df_duration.iloc[df_duration.idxmin()['duration_direct']]['duration_through_AED'] - df_duration.min()['duration_direct']
+        dif_AED_direct = df_duration[df_duration['duration_direct']==df_duration.min()['duration_direct']].min()['duration_through_AED'] - df_duration.min()['duration_direct']
         # difference between fastest and second fastest direct way
-        dif_2nd_1st_direct = df_duration.iloc[df_duration['duration_direct'].nsmallest(2).index[1]]['duration_direct'] - df_duration.min()['duration_direct']
+        dif_2nd_1st_direct = df_duration.iloc[df_duration.drop_duplicates(subset=['Responder_loc']).nsmallest(2,'duration_direct').index[1]]['duration_direct'] - df_duration.min()['duration_direct']
 
         # First check if any responder exist that is not furhter away than 600 seconds
         # DISCUSS
@@ -205,7 +209,7 @@ class route:
                     # If both is true:
                     # - Second fastest direct time will be send directly
                     # - Fastest direct and AED responder will be send through the AED
-                    coord_direct = (df_duration.iloc[df_duration['duration_direct'].nsmallest(2).index[1]]['longitude'], df_duration.iloc[df_duration['duration_direct'].nsmallest(2).index[1]]['latitude'])
+                    coord_direct = (df_duration.iloc[df_duration.drop_duplicates(subset=['Responder_loc']).nsmallest(2,'duration_direct').index[1]]['longitude'], df_duration.iloc[df_duration.drop_duplicates(subset=['Responder_loc']).nsmallest(2,'duration_direct').index[1]]['latitude'])
                     coord_AED =  (lon_direct, lat_direct)
                     AED_coordinates = df_duration.iloc[df_duration.idxmin()['duration_direct']]['AED_coordinates']
                 # If this is not true:
@@ -223,7 +227,10 @@ class route:
                 coord_direct = (lon_direct, lat_direct)
                 coord_AED = (lon_AED, lat_AED)
                 AED_coordinates = df_duration.iloc[df_duration.idxmin()['duration_through_AED']]['AED_coordinates']
-
+        
+        return {'coord_direct': coord_direct, 'coord_AED': coord_AED, 'AED_coordinates': AED_coordinates}
+    
+        '''
         # Get both routes
         direct_route = self.directions([coord_direct, Patient])
         AED_route = self.directions([coord_AED, AED_coordinates, Patient])
@@ -231,10 +238,14 @@ class route:
         # Get a dataframe of the description of the route for plotting
         # To transform the route into usable data frame for plotting with the get_coordinates function
         df_latlong_direct = self.get_coordinates(direct_route['coordinates'])
-        df_latlong_AED = self.get_coordinates(AED_route['coordinates'])      
+        df_latlong_AED = self.get_coordinates(AED_route['coordinates'])
+
+        # plot the AEDs
+        fig = px.scatter_mapbox(AEDs, lat="latitude", lon="longitude", zoom=3, height=300, color_discrete_sequence=["green"])
+        fig.update_traces(marker=dict(size=7)) 
 
         # plot the direct way
-        fig = px.line_mapbox(df_latlong_direct, lat="lat", lon="lon", zoom=3, height=300)
+        fig.add_trace(px.line_mapbox(df_latlong_direct, lat="lat", lon="lon").data[0])
         # Add the route through the AED
         fig.add_trace(px.line_mapbox(df_latlong_AED, lat='lat', lon='lon').data[0]) 
             
@@ -297,9 +308,9 @@ class route:
         fig.add_trace(AED_marker)
         
         # Color the direct responder in darkblue and the one through the AED in orange
-        fig.update_traces(line=dict(color='darkblue', width = 4), selector=0)
-        fig.update_traces(line=dict(color='orange', width = 4), selector=1)
+        fig.update_traces(line=dict(color='orange', width = 4), selector=2)
+        fig.update_traces(line=dict(color='darkblue', width = 4), selector=1)
         fig.update_layout(mapbox_style="carto-positron", mapbox_zoom=14, mapbox_center_lat=df_latlong_direct['lat'].iloc[0],
                           margin={"r": 0, "t": 0, "l": 0, "b": 0})
-        fig.show()
-    
+        return fig
+        '''

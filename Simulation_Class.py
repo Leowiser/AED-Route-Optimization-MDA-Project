@@ -1,3 +1,14 @@
+import openrouteservice
+from openrouteservice import client
+import numpy as np
+import pandas as pd
+import geopandas as gpd
+from shapely import geometry
+import time
+import geopy.distance
+
+
+
 class simulation:
     def __init__(self):
         self.Client_ors = openrouteservice.Client(key='5b3ce3597851110001cf624802e069d6633748a5ae4e9842334f1dc2')
@@ -12,7 +23,7 @@ class simulation:
 
         # set the parameters for conducting an isochrone search
         isochrones_parameters = {
-        'locations': list([Patient['longitude'][i], Patient['latitude'][i]] for i in range(len(Patient))),
+        'locations':  [(Patient['longitude'], Patient['latitude'])],
         'profile': profile,
         'range_type': 'time',
         'range': [threshold] # 10 minutes away (600 seconds)
@@ -29,7 +40,7 @@ class simulation:
         isochrone = ors_client_custom.isochrones(**isochrones_parameters)
 
         # Transform the isochrone into a polygon and add it to a Geo Data Frame
-        gdf = gpd.GeoDataFrame([geometry.Polygon(isochrone['features'][i]['geometry']['coordinates'][0]) for i in range(len(Patient))])
+        gdf = gpd.GeoDataFrame({'geometry': [geometry.Polygon(isochrone['features'][0]['geometry']['coordinates'][0])]})
 
         # Transform the coordinates to a geodataframe points
         # Define the points of all locations
@@ -37,11 +48,8 @@ class simulation:
 
         # Check which points are within the polygon.
         # Create tuple that includes all points in 10 minute walking distance from the patient
-        df = pd.DataFrame(columns = ['coordinates', 'patient'])
-        for k in range(len(Patient)):
-            coordinate_tuples = [[(point.x, point.y), k] for point in points if point.within(gdf[0][k])]
-            df_temporary = pd.DataFrame(coordinate_tuples, columns = ['coordinates', 'patient'])
-            df = pd.concat([df,df_temporary])
+        coordinate_tuples = [[(point.x, point.y)] for point in points if point.within(gdf.loc[0,'geometry'])]
+        df = pd.DataFrame(coordinate_tuples, columns = ['coordinates'])
         # Returns a list of tuples of the coordinates of the responders. (long, lat)
         
         return df
@@ -77,51 +85,36 @@ class simulation:
         # Time that the isochrones covers in seconds
         t_Responder = Dist_responder
         Responders_loc = self.closest_location(Patient, Responders,threshold=Dist_responder)
-        subset_responder = [Responders_loc[Responders_loc.loc[:,'patient']==i] for i in range(len(pd.unique(Responders_loc['patient'])))]
 
         # Time that the isochrones covers in seconds
         t_AED = Dist_AED
         AED_loc = self.closest_location(Patient, AEDs, threshold=Dist_AED)
-        subset_aed = [AED_loc[AED_loc.loc[:,'patient']==i] for i in range(len(pd.unique(AED_loc['patient'])))]  
 
         # Time that the isochrones covers in seconds
         t_Vector = Dist_Vector
         Vector_loc = self.closest_location(Patient, Vectors, profile = 'driving-car', threshold = Dist_Vector)
-        subset_vector = [Vector_loc[Vector_loc.loc[:,'patient']==i] for i in range(len(pd.unique(Vector_loc['patient'])))]
 
         # Set empty dictionary to be fillled later
         df_duration = pd.DataFrame(columns = ['Patient_loc', 'Responder_lon', 'Responder_lat', 
                 'duration_Responder', 'AED_lon', 'AED_lat','duration_AED','Vector_lon', 'Vector_lat',
                 'duration_Vector'])
         
-        # iterate through all patients
-        for i in range(len(Patient)):
-            # If there are no responders and no vectors in the set distance,
-            # the thresholds are increased to find responders or vectors close by.
-            while ((len(subset_responder[i]) == 0) and (len(subset_vector[i]) == 0)):
-                print('No repsonder or vector is close by. Increase of thresholds')
-                t_Responder += 120
-                Responders_loc = self.closest_location(Patient.loc[i], Responders, threshold=t_Responder)
-                subset_responder = [Responders_loc[Responders_loc.loc[:,'patient']==i] for i in range(len(pd.unique(Responders_loc['patient'])))]
-                t_Vector += 120
-                subset_vector[i] = self.closest_location(Patient[i], Vectors, profile = 'driving-car', threshold = t_Vector)
-            # If ther is a vector close by but no responder in 10 minutes distance than only the vector will be send.
-            if ((len(subset_responder[i]) == 0) and (len(subset_vector[i]) > 0)):
-                print('No responder is in a 10 minute radius')
-                df_vector_i = self.fastest_vector(Patient.loc[i], subset_vector[i])
-                df_duration = pd.concat([df_duration, df_vector_i])
-            # If vectors and responders are in the isochrones new differentiations are made.
-            elif ((len(subset_responder[i]) > 0) and (len(subset_vector[i]) > 0)):
-                # If there are no AEDs are close by it is just a comparisson between the directly send responder and the vector.
-                if((len(subset_aed[i]) == 0) or (len(subset_responder[i])<2)):
-                    print('Comparing direct responder vs. vectors')
-                    df_direct_i = self.direct_vs_vector(Patient.loc[i], subset_vector[i], subset_responder[i])
-                    df_duration= pd.concat([df_duration, df_direct_i])
-                # Else the direct, indirect and vectors are calculated.
-                else:
-                    print('Comparing resopnders vs. vectors')
-                    df_comp_i = self.fastest_comparisson(Patient.loc[i], subset_vector[i], subset_responder[i], subset_aed[i])
-                    df_duration= pd.concat([df_duration, df_comp_i])
+        while ((len(Responders_loc) == 0) and (len(Vector_loc) == 0)):
+            print('No repsonder or vector is close by. Increase of thresholds')
+            t_Responder += 120
+            Responders_loc = self.closest_location(Patient, Responders, threshold=t_Responder)
+            t_Vector += 120
+            Vector_loc = self.closest_location(Patient, Vectors, profile = 'driving-car', threshold = t_Vector)
+        if ((len(Responders_loc) == 0) and (len(Vector_loc) > 0)):
+            print('No responder is in a 10 minute radius')
+            df_duration = self.fastest_vector(Patient, Vector_loc)
+        elif ((len(Responders_loc) > 0) and (len(Vector_loc) > 0)):
+            if((len(AED_loc) == 0) or (len(Responders_loc)<2)):
+                print('Comparing direct responder vs. vectors')
+                df_duration = self.direct_vs_vector(Patient, Vector_loc, Responders_loc)
+            else:
+                print('Comparing resopnders vs. vectors')
+                df_duration = self.fastest_comparisson(Patient, Vector_loc, Responders_loc, AED_loc)
         # Returns a data frame.          
         return df_duration
 
@@ -205,8 +198,8 @@ class simulation:
         loc_Patient = subset_vector.iloc[subset_vector.idxmin()['duration']]['Patient_loc']
         print('Duration for Vectors found')
 
-        print('Let us celebrate the succeseith a quick tea. See you again in 2 minutes')
-        time.sleep(120)
+        print('Let us celebrate the success with a quick tea. See you again in 40 seconds')
+        time.sleep(40)
         
         dict = {'Patient_loc':[loc_Patient], 
                 'Responder_lon':lon_Responder, 'Responder_lat':lat_Responder, 
@@ -229,7 +222,7 @@ class simulation:
         Responder_df['Patient_lat']  = Patient.loc[0, ('latitude')]
         Responder_df['Patient_loc'] = list(zip(Responder_df['Patient_lon'],Responder_df['Patient_lat']))
         Responder_df['dist_patient'] = Responder_df.apply(lambda row: geopy.distance.distance(row['Responder_loc'], row['Patient_loc']).meters, axis=1)
-        # only keep the 20 closest responders. keep='all' so that more that all responders with the 10 lowest values are kept.        
+        # only keep the 15 closest responders. keep='all' so that more that all responders with the 10 lowest values are kept.        
         subset_responder = Responder_df.nsmallest(15, 'dist_patient', keep='all')
         subset_responder['duration_direct']=[self.directions([i, Patient_cood])['duration'] for i,
                                              Patient_cood in zip(subset_responder['Responder_loc'], subset_responder['Patient_loc'])]
@@ -238,9 +231,8 @@ class simulation:
         subset_responder = subset_responder.reset_index(drop = True)
         print('Duration for responders found')
 
-        print('You did a lot take a 90 second break.')
-        time.sleep(90.0)
-        # only keep the 10 closest responders. keep='all' so that more that all responders with the 10 lowest values are kept. 
+        print('You did a lot take a 30 second break.')
+        time.sleep(30.0)
         AED_df = pd.DataFrame(AED_loc)
         AED_df.rename(columns = {'coordinates':'AED_coordinates'}, inplace = True)
         df_merged = pd.merge(subset_responder.assign(key=1), AED_df.assign(key=1),
@@ -259,10 +251,9 @@ class simulation:
         
         # Check if the fastest response time with AED is only slightly slower/faster than the direct routing and how different it is
         # for the second fastest
-        dif_AED_direct = df_merged.iloc[df_merged.idxmin()['duration_direct']]['duration_through_AED'] - df_merged.min()['duration_direct']
-        dif_2nd_1st = df_merged.iloc[df_merged.idxmin()['duration_direct']]['duration_through_AED'] - subset.min()['duration_through_AED']
+        dif_AED_direct = df_merged[df_merged['duration_direct']==df_merged.min()['duration_direct']].min()['duration_through_AED'] - df_merged.min()['duration_direct']
         # difference between fastest and second fastest direct way
-        dif_2nd_1st_direct = df_merged.iloc[df_merged['duration_direct'].nsmallest(2).index[1]]['duration_direct'] - df_merged.min()['duration_direct']
+        dif_2nd_1st_direct = df_merged.iloc[df_merged.drop_duplicates(subset=['Responder_loc']).nsmallest(2,'duration_direct').index[1]]['duration_direct'] - df_merged.min()['duration_direct']
 
         # Now check if the fastest through AED is the same as the fastest direct 
         if coord_direct == coord_AED:
@@ -274,20 +265,20 @@ class simulation:
                 # If both is true:
                 # - Second fastest direct time will be send directly
                 # - Fastest direct and AED responder will be send through the AED
-                coord_direct = df_merged.iloc[df_merged['duration_direct'].nsmallest(2).index[1]]['Responder_loc']
+                coord_direct = (df_merged.iloc[df_merged.drop_duplicates(subset=['Responder_loc']).nsmallest(2,'duration_direct').index[1]]['duration_direct'])
                 coord_AED =  df_merged.iloc[df_merged.idxmin()['duration_direct']]['Responder_loc']
                 AED_coordinates = df_merged.iloc[df_merged.idxmin()['duration_direct']]['AED_coordinates']
-                fastest_Responder = df_merged.iloc[df_merged['duration_direct'].nsmallest(2).index[1]]['duration_direct']
-                fastest_AED = df_merged.iloc[df_merged.idxmin()['duration_direct']]['duration_through_AED']
+                fastest_Responder = df_merged.iloc[df_merged.drop_duplicates(subset=['Responder_loc']).nsmallest(2,'duration_direct').index[1]]['duration_direct']
+                fastest_AED = df_merged[df_merged['duration_direct']==df_merged.min()['duration_direct']].min()['duration_through_AED']
+            else:
                 # If this is not true:
                 # - Fastes direct responder will be send directly
-                # - Second fastest through AED responder will be send through the AED
-            else:
+                # - Second fastest through AED responder will be send through the AED                
                 coord_direct = coord_direct
                 coord_AED = subset.iloc[subset.idxmin()['duration_through_AED']]['AED_coordinates']
                 AED_coordinates = subset.iloc[subset.idxmin()['duration_through_AED']]['AED_coordinates']
                 fastest_Responder = df_merged.iloc[df_merged.idxmin()['duration_direct']]['duration_direct']
-                fastest_AED = df_merged.iloc[df_merged['duration_direct'].nsmallest(2).index[1]]['duration_through_AED']
+                fastest_AED = subset.iloc[subset.idxmin()['duration_through_AED']]['duration_through_AED']
         else:
             print('Fastest Direct and Indirect are not the same')
             # If the fastest direct responder and thorugh AED responder are different:
