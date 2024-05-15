@@ -6,18 +6,13 @@ class survival_prob:
         # info on survival rates from: https://www.sciencedirect.com/science/article/pii/S0019483219304080
         # and from here: https://jamanetwork.com/journals/jama/fullarticle/196200
         # and from here: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2600120/
-    def probability_survival(duration_responder, duration_AED, duration_vector, decrease_with_cpr = 0.97, decrease_no_cpr = 0.9):
+    def probability_survival(self, duration_responder, duration_AED, duration_vector, decrease_with_cpr = 0.97, decrease_no_cpr = 0.9):
         # explanation of parameters 
-        # duration_responder: time it takes for responder without aed to arrive 
-        # duration_AED: for aed to arrive 
-        # duration_vector: for vector to arrive 
+        # duration_responder: time it takes for responder without aed to arrive, integer
+        # duration_AED: for aed to arrive, integer
+        # duration_vector: for vector to arrive, integer
         # decrease_with_cpr: decrease in survival if cpr is perfromed  
         # decrease_no_cpr: decrease in survival if cpr is not performed 
-
-        # convert to right format 
-        duration_responder = int(duration_responder)
-        duration_AED = int(duration_AED)
-        duration_vector = int(duration_vector)
 
         prob_resp = 1 # starting probability to survive with responder
         prob_vec = 1 # starting probability to survive with vector 
