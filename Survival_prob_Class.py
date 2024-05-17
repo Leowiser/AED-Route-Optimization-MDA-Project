@@ -33,5 +33,5 @@ class survival_prob:
             # time with cpr before aed arrives in min 
             time_with_cpr = (fastest_aed-duration_responder)/60
             # decrease in survival when cpr is started after a while   
-            prob_resp = prob_resp * decrease_no_cpr ** time_no_cpr * decrease_with_cpr
+            prob_resp = prob_resp * decrease_no_cpr ** time_no_cpr * decrease_with_cpr**time_with_cpr
         return prob_resp, prob_vec 
