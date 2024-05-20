@@ -265,7 +265,7 @@ class simulation:
                 # If both is true:
                 # - Second fastest direct time will be send directly
                 # - Fastest direct and AED responder will be send through the AED
-                coord_direct = (df_merged.iloc[df_merged.drop_duplicates(subset=['Responder_loc']).nsmallest(2,'duration_direct').index[1]]['duration_direct'])
+                coord_direct = (df_merged.iloc[df_merged.drop_duplicates(subset=['Responder_loc']).nsmallest(2,'duration_direct').index[1]]['Responder_loc'])
                 coord_AED =  df_merged.iloc[df_merged.idxmin()['duration_direct']]['Responder_loc']
                 AED_coordinates = df_merged.iloc[df_merged.idxmin()['duration_direct']]['AED_coordinates']
                 fastest_Responder = df_merged.iloc[df_merged.drop_duplicates(subset=['Responder_loc']).nsmallest(2,'duration_direct').index[1]]['duration_direct']
