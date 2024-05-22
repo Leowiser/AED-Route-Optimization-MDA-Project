@@ -288,7 +288,6 @@ class simulation:
                 AED_coordinates = df_merged.iloc[df_merged.idxmin()['duration_direct']]['AED_coordinates']
                 fastest_Responder = df_merged.iloc[df_merged.drop_duplicates(subset=['Responder_loc']).nsmallest(2,'duration_direct').index[1]]['duration_direct']
                 fastest_AED = df_merged[df_merged['duration_direct']==df_merged.min()['duration_direct']].min()['duration_through_AED']
-                print(f"Person A should fetch the AED. Survival probability: {y3_A:.4f}")
 
             else:
                 # - Fastes direct responder will be send directly
@@ -297,8 +296,7 @@ class simulation:
                 coord_AED = subset.iloc[subset.idxmin()['duration_through_AED']]['AED_coordinates']
                 AED_coordinates = subset.iloc[subset.idxmin()['duration_through_AED']]['AED_coordinates']
                 fastest_Responder = df_merged.iloc[df_merged.idxmin()['duration_direct']]['duration_direct']
-                fastest_AED = subset.iloc[subset.idxmin()['duration_through_AED']]['duration_through_AED']
-                print(f"Wait for Person B with AED. Survival probability: {y3_B:.4f}")        
+                fastest_AED = subset.iloc[subset.idxmin()['duration_through_AED']]['duration_through_AED']     
         else:
             print('Fastest Direct and Indirect are not the same')
             # If the fastest direct responder and thorugh AED responder are different:
