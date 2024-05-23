@@ -84,12 +84,9 @@ class simulation:
     def fastest_time(self, Patient, Responders, AEDs, Vectors, Dist_responder = 600, Dist_AED = 600, Dist_Vector = 600, threshold = 700):
         # Time that the isochrones covers in seconds
         Responders_loc = self.closest_location(Patient, Responders,threshold=Dist_responder)
-
         # Time that the isochrones covers in seconds
         AED_loc = self.closest_location(Patient, AEDs, threshold=Dist_AED)
-
         # Time that the isochrones covers in seconds
-        t_Vector = Dist_Vector
         Vector_loc = self.closest_location(Patient, Vectors, profile = 'driving-car', threshold = Dist_Vector)
 
         # Set empty dictionary to be fillled later
@@ -101,15 +98,16 @@ class simulation:
         # If this is not the case the isochrone radius is increased for 2 minutes until at least one vector is found. 
         while (len(Vector_loc) == 0):
             print('No vector is close by. Increase of thresholds')
-            t_Vector += 120
-            Vector_loc = self.closest_location(Patient, Vectors, profile = 'driving-car', threshold = t_Vector)
+            Dist_Vector += 120
+            Vector_loc = self.closest_location(Patient, Vectors, profile = 'driving-car', threshold = Dist_Vector)
         
         # If there are no responders close by the isochrone radius for them and the AED is increased to the same time as the one of the vector before.
         # This is done as the Responders could still be faster than the Vectors and thus incerease the survival rate.
         if (len(Responders_loc)==0):
-            Responders_loc = self.closest_location(Patient, Responders, threshold=t_Vector)
-            AED_loc = self.closest_location(Patient, AEDs, threshold=t_Vector)
-
+            Responders_loc = self.closest_location(Patient, Responders, threshold=Dist_Vector)
+            AED_loc = self.closest_location(Patient, AEDs, threshold=Dist_Vector)
+        else:
+            pass
         
         # If the Responder is still 0 only the Vectors time will be calculated
         if ((len(Responders_loc) == 0) and (len(Vector_loc) > 0)):
