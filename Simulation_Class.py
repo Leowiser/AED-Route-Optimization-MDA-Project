@@ -83,7 +83,6 @@ class simulation:
     # duration for the direct route, and the coordinates of the used AED
     def fastest_time(self, Patient, Responders, AEDs, Vectors, Dist_responder = 600, Dist_AED = 600, Dist_Vector = 600, threshold = 700):
         # Time that the isochrones covers in seconds
-        t_Responder = Dist_responder
         Responders_loc = self.closest_location(Patient, Responders,threshold=Dist_responder)
 
         # Time that the isochrones covers in seconds
