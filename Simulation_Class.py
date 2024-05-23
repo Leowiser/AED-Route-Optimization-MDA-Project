@@ -87,7 +87,6 @@ class simulation:
         Responders_loc = self.closest_location(Patient, Responders,threshold=Dist_responder)
 
         # Time that the isochrones covers in seconds
-        t_AED = Dist_AED
         AED_loc = self.closest_location(Patient, AEDs, threshold=Dist_AED)
 
         # Time that the isochrones covers in seconds
@@ -99,19 +98,31 @@ class simulation:
                 'duration_Responder', 'AED_lon', 'AED_lat','duration_AED','Vector_lon', 'Vector_lat',
                 'duration_Vector'])
         
-        while ((len(Responders_loc) == 0) and (len(Vector_loc) == 0)):
-            print('No repsonder or vector is close by. Increase of thresholds')
-            t_Responder += 120
-            Responders_loc = self.closest_location(Patient, Responders, threshold=t_Responder)
+        # Check if any vector is reached in 10 minutes. 
+        # If this is not the case the isochrone radius is increased for 2 minutes until at least one vector is found. 
+        while (len(Vector_loc) == 0):
+            print('No vector is close by. Increase of thresholds')
             t_Vector += 120
             Vector_loc = self.closest_location(Patient, Vectors, profile = 'driving-car', threshold = t_Vector)
+        
+        # If there are no responders close by the isochrone radius for them and the AED is increased to the same time as the one of the vector before.
+        # This is done as the Responders could still be faster than the Vectors and thus incerease the survival rate.
+        if (len(Responders_loc)==0):
+            Responders_loc = self.closest_location(Patient, Responders, threshold=t_Vector)
+            AED_loc = self.closest_location(Patient, AEDs, threshold=t_Vector)
+
+        
+        # If the Responder is still 0 only the Vectors time will be calculated
         if ((len(Responders_loc) == 0) and (len(Vector_loc) > 0)):
             print('No responder is in a 10 minute radius')
             df_duration = self.fastest_vector(Patient, Vector_loc)
+        # Otherwise the two have to be compared.
         elif ((len(Responders_loc) > 0) and (len(Vector_loc) > 0)):
+            # If no AED is close by, the time of the direct responder is returned 
             if((len(AED_loc) == 0) or (len(Responders_loc)<2)):
                 print('Comparing direct responder vs. vectors')
                 df_duration = self.direct_vs_vector(Patient, Vector_loc, Responders_loc)
+            # Else it is compared whether the fastest or second fastest responder should be send through the AED based on the surviveability value.
             else:
                 print('Comparing resopnders vs. vectors')
                 df_duration = self.fastest_comparisson(Patient, Vector_loc, Responders_loc, AED_loc)
@@ -293,7 +304,7 @@ class simulation:
                 # - Fastes direct responder will be send directly
                 # - Second fastest through AED responder will be send through the AED                
                 coord_direct = coord_direct
-                coord_AED = subset.iloc[subset.idxmin()['duration_through_AED']]['AED_coordinates']
+                coord_AED = subset.iloc[subset.idxmin()['duration_through_AED']]['Responder_loc']
                 AED_coordinates = subset.iloc[subset.idxmin()['duration_through_AED']]['AED_coordinates']
                 fastest_Responder = df_merged.iloc[df_merged.idxmin()['duration_direct']]['duration_direct']
                 fastest_AED = subset.iloc[subset.idxmin()['duration_through_AED']]['duration_through_AED']     
