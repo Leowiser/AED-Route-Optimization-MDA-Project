@@ -96,6 +96,7 @@ class simulation:
         
         # Check if any vector is reached in 10 minutes. 
         # If this is not the case the isochrone radius is increased for 2 minutes until at least one vector is found. 
+        Dist_Vector = 600
         while (len(Vector_loc) == 0):
             print('No vector is close by. Increase of thresholds')
             Dist_Vector += 120
@@ -260,6 +261,8 @@ class simulation:
         coord_AED = df_merged.iloc[df_merged.idxmin()['duration_through_AED']]['Responder_loc']
         # coordinates of the AED with the second fastest route
         subset = df_merged[(df_merged['duration_direct']>df_merged.min()['duration_direct'])]
+        # Reset the index for later slicing to work.
+        subset = subset.reset_index(drop=True)
         
         # Starting decision rule to decide who collects the AED
         # Parameters for caculating the survival probability
