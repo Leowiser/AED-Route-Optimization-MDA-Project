@@ -261,7 +261,7 @@ class simulation:
         coord_AED = df_merged.iloc[df_merged.idxmin()['duration_through_AED']]['Responder_loc']
         # coordinates of the AED with the second fastest route
         subset = df_merged[(df_merged['duration_direct']>df_merged.min()['duration_direct'])]
-        # Reset the index for later slicing to work.
+        # Reset the index for later indexing to work.
         subset = subset.reset_index(drop=True)
         
         # Starting decision rule to decide who collects the AED
@@ -270,7 +270,7 @@ class simulation:
         # t_b = Total time for second fastest responder to arrive with AED
         # t_a_no_aed = Time for fastest responder to start CPR without AED
         t_a = df_merged[df_merged['duration_direct']==df_merged.min()['duration_direct']].min()['duration_through_AED'] 
-        t_b = subset.iloc[df_merged.idxmin()['duration_through_AED']]['duration_through_AED']  
+        t_b = subset.iloc[subset.idxmin()['duration_through_AED']]['duration_through_AED']  
         t_a_no_aed = df_merged.min()['duration_direct']  
         # t_b_CPR = Time of CPR until second fastest responder arrives
         t_b_CPR = (t_b-t_a_no_aed)
