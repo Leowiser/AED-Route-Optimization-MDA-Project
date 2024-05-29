@@ -10,9 +10,9 @@ import os
 
 from Routing_Class import route
 
-server = app.server
-
 app = dash.Dash(__name__, title='Zambia MDA Project', external_stylesheets=[dbc.themes.BOOTSTRAP])
+
+server = app.server
 
 route = route()
 
