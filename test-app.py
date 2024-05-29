@@ -1,4 +1,5 @@
 import dash
+from dash import html
 
 # Create a Dash application instance
 app = dash.Dash(__name__)
