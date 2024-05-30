@@ -137,6 +137,7 @@ class route:
         Responder_df['dist_patient'] = Responder_df.apply(lambda row: geopy.distance.distance(row['Responder_loc'], row['Patient_loc']).meters, axis=1)
         # only keep the 5 closest responders. keep='all' so that more that all responders with the 5 lowest values are kept.
         Responder_df = Responder_df.nsmallest(5, 'dist_patient', keep='all')
+        Responder_df = Responder_df.reset_index(drop=True)
         Responder_df['duration_direct']=[self.directions([i, Patient_cood], profile = 'foot-walking')['duration'] for i, 
                                           Patient_cood in zip(Responder_df['Responder_loc'], Responder_df['Patient_loc'])]
         # if the distance is lower than the threshold (default is 700 meters), the foot walking distance is calculated and otherwise the value
@@ -177,6 +178,11 @@ class route:
         df_latlong = pd.DataFrame(dict)
         return df_latlong
     
+    # Function to simulate survival probability.
+    # Used in send_responders to decide which responder should be send directly.
+    def survival_probability(self, x, z):
+        return 0.9 **(x/60)* 0.97**(z/60)
+    
     # Function to find the responder that is send directly and through the AED.
     # The results are plotted using plotly
     def send_responders(self, Patient, Responders, AEDs):
@@ -190,24 +196,50 @@ class route:
         # longitude of the Responder with the fastest time through an AED
         lon_AED = df_duration.iloc[df_duration.idxmin()['duration_through_AED']]['longitude']
         # coordinates of the AED with the fastest route
-        subset = df_duration[(df_duration['duration_direct']>df_duration.min()['duration_direct']) & (df_duration['duration_direct']>df_duration.min()['duration_direct'])]
-        # Check if the fastest response time with AED is only slightly slower/faster than the direct routing and how different it is
-        # for the second fastest
-        dif_AED_direct = df_duration[df_duration['duration_direct']==df_duration.min()['duration_direct']].min()['duration_through_AED'] - df_duration.min()['duration_direct']
-        # difference between fastest and second fastest direct way
-        dif_2nd_1st_direct = df_duration.iloc[df_duration.drop_duplicates(subset=['Responder_loc']).nsmallest(2,'duration_direct').index[1]]['duration_direct'] - df_duration.min()['duration_direct']
+        subset = df_duration[(df_duration['duration_direct']>df_duration.min()['duration_direct'])]
+        # Reset the index for later indexing to work.
+        subset = subset.reset_index(drop=True)
+        # Starting decision rule to decide who collects the AED
+        # Parameters for caculating the survival probability
+        # t_a = Total time for fastest responder to arrive with AED
+        # t_b = Total time for second fastest responder to arrive with AED
+        # t_a_no_aed = Time for fastest responder to start CPR without AED
+        t_a = df_duration[df_duration['duration_direct']==df_duration.min()['duration_direct']].min()['duration_through_AED']
+        t_b = subset.iloc[subset['duration_direct']==subset.min()['duration_direct']].min()['duration_through_AED']
+        t_b_aed = subset.iloc[subset.idxmin()['duration_through_AED']]['duration_through_AED']  
+        t_a_no_aed = df_duration.min()['duration_direct']  
+        
+        # t_b_CPR = Time of CPR until second fastest responder arrives
+        t_a_CPR = (t_a-t_b)
+        # t_b_CPR = Time of CPR until second fastest responder arrives
+        t_b_CPR = (t_b-t_a_no_aed)
+
+        # Calculate survival probabilities with function survival_probability
+        # - 0.9 ** (x/60) * 0.97 ** (z/60)
+        # - x is the time without CPR, z is the time with CPR in minutes
+
+        # Fastest responder going for the AED
+        # Check if the 2nd fastest direct responder is faster than the fastes direct through AED
+        if t_b < t_a:
+            # if so, z equal to CPR by 2nd fastest responder
+            surv_A = self.survival_probability(t_a_CPR, t_b)
+        else:
+            # - z equals zero as no one does any CPR
+            surv_A = self.survival_probability(t_a, 0)
+        # 2nd fastest responder arriving with AED
+        # - time until AED arrives minus time CPR arrives is the time without CPR
+        surv_B = self.survival_probability(t_b_CPR, t_a_no_aed)
 
         # First check if any responder exist that is not furhter away than 600 seconds
         # DISCUSS
         if df_duration[df_duration['duration_direct']<1200].any()['duration_direct'] and df_duration[df_duration['duration_through_AED']<1200].any()['duration_through_AED']:
             # Now check if the fastest through AED is the same as the fastest direct 
             if lat_direct==lat_AED and lon_direct==lon_AED:
-                # Check if the difference between direct route and route through AED is miner (less than 30 seconds)
-                # and if the difference between second fastest direct and the fastest direct is not to big (60 seconds)
-                # This is done because time is of essence and otherwise the fast responder could be left out
-                if ((dif_AED_direct < 30) and(dif_2nd_1st_direct < 60)):
-                    # If both is true:
-                    # - Second fastest direct time will be send directly
+                # Find best strategy which is the maximal survival chances
+                best_strategy = max(surv_A, surv_B)
+                # Send responders
+                if best_strategy == surv_A:
+                    # - Second fastest direct time will be send directly  
                     # - Fastest direct and AED responder will be send through the AED
                     coord_direct = (df_duration.iloc[df_duration.drop_duplicates(subset=['Responder_loc']).nsmallest(2,'duration_direct').index[1]]['longitude'], df_duration.iloc[df_duration.drop_duplicates(subset=['Responder_loc']).nsmallest(2,'duration_direct').index[1]]['latitude'])
                     coord_AED =  (lon_direct, lat_direct)
