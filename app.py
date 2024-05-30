@@ -35,6 +35,20 @@ lon = 4.7005
 fig = px.scatter_mapbox(aed, lat="latitude", lon="longitude", color_discrete_sequence=["green"])
 fig.update_traces(marker=dict(size=7))
 
+# Add responders to the map
+fig.add_trace(go.Scattermapbox(
+    lat=responder['latitude'],
+    lon=responder['longitude'],
+    mode='markers',
+    marker=go.scattermapbox.Marker(
+        size=7,
+        color='blue',
+        symbol='circle',
+        opacity=0.8,
+    ),
+    name='Responder'
+))
+
 fig.add_trace(go.Scattermapbox(
     lat=[lat],
     lon=[lon],
@@ -137,7 +151,7 @@ def update_chart(n_clicks, latitude_value, longitude_value):
     df_latlong_AED = route.get_coordinates(AED_route['coordinates'])
 
     # "Reset" the plot to keep only the AED locations
-    fig.data = [fig.data[0]]
+    fig.data = [fig.data[0], fig.data[1]]
     # Plot the new patient location (after user changed input)
     updated_fig = fig.update_traces(lat=[latitude_value], lon=[longitude_value], selector=dict(name='Patient'))
     updated_fig.update_layout(mapbox_center={"lat": latitude_value, "lon": longitude_value})    # center plot around the new coordinates
