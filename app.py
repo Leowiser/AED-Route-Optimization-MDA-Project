@@ -35,8 +35,16 @@ lat = 50.8798
 lon = 4.7005
 
 # Create a map figure
-fig = px.scatter_mapbox(aed, lat="latitude", lon="longitude", color_discrete_sequence=["green"])
-fig.update_traces(marker=dict(size=7))
+fig = go.Figure(go.Scattermapbox(
+    lat=aed['latitude'],
+    lon=aed['longitude'],
+    mode='markers',
+    marker=go.scattermapbox.Marker(
+        size=7,
+        color='green',
+    ),
+    name='AEDs'
+))
 
 # Add responders to the map
 fig.add_trace(go.Scattermapbox(
@@ -49,7 +57,7 @@ fig.add_trace(go.Scattermapbox(
         symbol='circle',
         opacity=0.8,
     ),
-    name='Responder'
+    name='Responders'
 ))
 
 fig.add_trace(go.Scattermapbox(
@@ -164,7 +172,7 @@ def update_chart(n_clicks, proportion, latitude_value, longitude_value):
         responder = generate_responders(proportion)
 
         # Update the figure with new responders
-        fig.data = [fig.data[0]]  # Keep only AED locations
+        fig.data = [fig.data[0]]    # Keep only AED locations
 
         fig.add_trace(go.Scattermapbox(
             lat=responder['latitude'],
@@ -211,7 +219,7 @@ def update_chart(n_clicks, proportion, latitude_value, longitude_value):
         df_latlong_AED = route.get_coordinates(AED_route['coordinates'])
 
         # "Reset" the plot to keep only the AED locations
-        fig.data = [fig.data[0]]  # Keep only AED locations
+        fig.data = [fig.data[0]]    # Keep only AED locations
 
         # Add responders back to the map
         fig.add_trace(go.Scattermapbox(
@@ -290,7 +298,7 @@ def update_chart(n_clicks, proportion, latitude_value, longitude_value):
             lat=[AED_coordinates[1]],
             lon=[AED_coordinates[0]],
             mode='markers',
-            name='AED',
+            name='AED to pick up',
             marker=go.scattermapbox.Marker(
                 size=15,
                 color='green'
