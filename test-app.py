@@ -9,28 +9,27 @@ import plotly.express as px
 import os
 
 from Routing_Class import route
+from FR_Generation_Class import FR_Generation as fr
 
 app = dash.Dash(__name__, title='Zambia MDA Project', external_stylesheets=[dbc.themes.BOOTSTRAP])
 
+
+## Required to deploy on Heroku
 server = app.server
 
 route = route()
 
-# Generate 40 random lat and long for responders
-N = 40
-lon_resp = np.random.uniform(4.69, 4.71, N)
-lat_resp = np.random.uniform(50.85, 50.88, N)
+# Generate a realistic dispersion of first responders using FR_Generation_Class
+gdf, pop_df = fr.load_data()
+pop_gdf, location_pop = fr.stat_sec_proportions(gdf, pop_df)
+responder = fr.generate_FRs(pop_gdf, location_pop, proportion=0.0005)
 
-# Create dataframe for responders
-responder = pd.DataFrame({'longitude': lon_resp, 'latitude': lat_resp})
-
-# Generate 10 random lat and long for AEDs
-N = 10
-lon_aed = np.random.uniform(4.69, 4.71, N)
-lat_aed = np.random.uniform(50.85, 50.88, N)
-
-# Create dataframe for AEDs
-aed = pd.DataFrame({'longitude': lon_aed, 'latitude': lat_aed})
+# Data of AED-s
+df_aed = pd.read_csv('filtered_AED_loc.csv')    # Cleaned dataset with the locations of the AEDs 
+AED_longitudes = df_aed['longitude'].values
+AED_latitudes = df_aed['latitude'].values
+aed = list(zip(AED_longitudes, AED_latitudes))    # Zip to one tuple 
+aed = pd.DataFrame(aed, columns=['longitude', 'latitude'])    # Transform aed to dataframe with headings
 
 # Coordinates of Leuven, Belgium
 lat = 50.8798
@@ -39,6 +38,10 @@ lon = 4.7005
 # Create a map figure
 fig = px.scatter_mapbox(aed, lat="latitude", lon="longitude", color_discrete_sequence=["green"])
 fig.update_traces(marker=dict(size=7))
+fig.add_trace(px.scatter_mapbox(responder, 
+                                lat="latitude", 
+                                lon="longitude", 
+                                color_discrete_sequence=["darkblue"]).data[0]) 
 
 fig.add_trace(go.Scattermapbox(
     lat=[lat],
