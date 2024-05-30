@@ -267,24 +267,34 @@ class simulation:
         # Starting decision rule to decide who collects the AED
         # Parameters for caculating the survival probability
         # t_a = Total time for fastest responder to arrive with AED
-        # t_b = Total time for second fastest responder to arrive with AED
+        # t_b = Total time for second fastest direct responder
+        # t_b_aed = Total time for second fastest responder to arrive with AED
         # t_a_no_aed = Time for fastest responder to start CPR without AED
-        t_a = df_merged[df_merged['duration_direct']==df_merged.min()['duration_direct']].min()['duration_through_AED'] 
-        t_b = subset.iloc[subset.idxmin()['duration_through_AED']]['duration_through_AED']  
+        t_a = df_merged[df_merged['duration_direct']==df_merged.min()['duration_direct']].min()['duration_through_AED']
+        t_b = subset.min()['duration_direct']
+        t_b_aed = subset.iloc[subset.idxmin()['duration_through_AED']]['duration_through_AED']  
         t_a_no_aed = df_merged.min()['duration_direct']  
+        
         # t_b_CPR = Time of CPR until second fastest responder arrives
-        t_b_CPR = (t_b-t_a_no_aed)
+        t_a_CPR = (t_a-t_b)
+        # t_b_CPR = Time of CPR until second fastest responder arrives
+        t_b_CPR = (t_b_aed-t_a_no_aed)
 
         # Calculate survival probabilities with function survival_probability
         # - 0.9 ** (x/60) * 0.97 ** (z/60)
         # - x is the time without CPR, z is the time with CPR in minutes
 
         # Fastest responder going for the AED
-        # - z equals zero as no one does any CPR
-        surv_A = self.survival_probability(t_a, 0)
-        # Second fastest responder arriving with AED
+        # Check if the 2nd fastest direct responder is faster than the fastes direct through AED
+        if t_b < t_a:
+            # if so, z equal to CPR by 2nd fastest responder
+            surv_A = self.survival_probability(t_b, t_a_CPR)
+        else:
+            # - z equals zero as no one does any CPR
+            surv_A = self.survival_probability(t_a, 0)
+        # 2nd fastest responder arriving with AED
         # - time until AED arrives minus time CPR arrives is the time without CPR
-        surv_B = self.survival_probability(t_b_CPR, t_a_no_aed)
+        surv_B = self.survival_probability(t_a_no_aed, t_b_CPR)
 
         # Now check if the fastest through AED is the same as the fastest direct 
         if coord_direct == coord_AED:
