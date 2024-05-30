@@ -4,10 +4,9 @@ import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
 import numpy as np
 import pandas as pd
-from dash.dependencies import Input, Output
+from dash.dependencies import Input, Output, State
 import plotly.express as px
 from Routing_Class import route
-
 
 app = dash.Dash(__name__, title='Zambia MDA Project', external_stylesheets=[dbc.themes.BOOTSTRAP])
 
@@ -21,13 +20,12 @@ lat_resp = np.random.uniform(50.85, 50.88, N)
 # Create dataframe for responders
 responder = pd.DataFrame({'longitude': lon_resp, 'latitude': lat_resp})
 
-# Generate 10 random lat and long for AEDs
-N = 10
-lon_aed = np.random.uniform(4.69, 4.71, N)
-lat_aed = np.random.uniform(50.85, 50.88, N)
-
-# Create dataframe for AEDs
-aed = pd.DataFrame({'longitude': lon_aed, 'latitude': lat_aed})
+# Data of AED-s
+df_aed = pd.read_csv('filtered_AED_loc.csv')    # Cleaned dataset with the locations of the AEDs 
+AED_longitudes = df_aed['longitude'].values
+AED_latitudes = df_aed['latitude'].values
+aed = list(zip(AED_longitudes, AED_latitudes))    # Zip to one tuple 
+aed = pd.DataFrame(aed, columns=['longitude', 'latitude'])    # Transform aed to dataframe with headings
 
 # Coordinates of Leuven, Belgium
 lat = 50.8798
@@ -57,7 +55,7 @@ fig.update_layout(
     mapbox_zoom=13,
     height=500,
     margin={"r": 0, "t": 0, "l": 0, "b": 0},
-    legend = dict(orientation = 'h', yanchor = 'bottom')
+    legend=dict(orientation='h', yanchor='bottom')
 )
 
 # lat-long user inputs
@@ -79,7 +77,6 @@ longitude_input = dcc.Input(
     style={'width': '100%'}
 )
 
-
 app.layout = dbc.Container(
     [
         html.Div(
@@ -97,7 +94,10 @@ app.layout = dbc.Container(
                         dbc.Row(html.Label("Patient latitude")),
                         dbc.Row(latitude_input),
                         dbc.Row(html.Label("Patient longitude")),
-                        dbc.Row(longitude_input)
+                        dbc.Row(longitude_input),
+                        html.Div(style={'height': '50px'}),
+                        dbc.Row(html.Label("Click button to calculate route")),
+                        dbc.Row(html.Button('Click me', id='button'))
                     ],
                     md=2
                 ),
@@ -110,13 +110,17 @@ app.layout = dbc.Container(
 )
 
 @app.callback(
-    Output('id_title', 'children'),
-    Output('id_graph', 'figure'),
-    [Input('latitude_input', 'value'),
-     Input('longitude_input', 'value')
-     ]
+    [Output('id_title', 'children'),
+     Output('id_graph', 'figure')],
+    [Input('button', 'n_clicks')],
+    [State('latitude_input', 'value'),
+     State('longitude_input', 'value')]
 )
-def update_chart(latitude_value, longitude_value):
+def update_chart(n_clicks, latitude_value, longitude_value):
+    if n_clicks is None:
+        # Initial rendering
+        return 'Coordinates of the patient (latitude, longitude): (' + str(lat) + ',' + str(lon) + ')', fig
+
     # Get coordinates of the optimal first-and second responder's and AED's location
     best_coordinates = route.send_responders((longitude_value, latitude_value), responder, aed)
     coord_direct = best_coordinates['coord_direct']
@@ -151,58 +155,58 @@ def update_chart(latitude_value, longitude_value):
 
     # Add marker for the first responder's initial location
     beginning_direct = go.Scattermapbox(
-    lat=[df_latlong_direct['lat'].iloc[0]],
-    lon=[df_latlong_direct['lon'].iloc[0]],
-    mode='markers',
-    name = 'Route of first responder',
-    marker=go.scattermapbox.Marker(
-        size=10,
-        color='darkblue'
-    ),
-    text='First responder direct',  # Text to display when hovering over the marker
-    hoverinfo='text'
+        lat=[df_latlong_direct['lat'].iloc[0]],
+        lon=[df_latlong_direct['lon'].iloc[0]],
+        mode='markers',
+        name='Route of first responder',
+        marker=go.scattermapbox.Marker(
+            size=10,
+            color='darkblue'
+        ),
+        text='First responder direct',  # Text to display when hovering over the marker
+        hoverinfo='text'
     )
 
     # Add markers for the first responder that takes the route through the AED
     beginning_AED = go.Scattermapbox(
-    lat=[df_latlong_AED['lat'].iloc[0]],
-    lon=[df_latlong_AED['lon'].iloc[0]],
-    mode='markers',
-    name = 'Route of responder through AED',
-    marker=go.scattermapbox.Marker(
-        size=10,
-        color='orange'
-    ),
-    text='Start responder through AED',
-    hoverinfo='text'
+        lat=[df_latlong_AED['lat'].iloc[0]],
+        lon=[df_latlong_AED['lon'].iloc[0]],
+        mode='markers',
+        name='Route of responder through AED',
+        marker=go.scattermapbox.Marker(
+            size=10,
+            color='orange'
+        ),
+        text='Start responder through AED',
+        hoverinfo='text'
     )
 
     # Add marker for the Patient
     Patient = go.Scattermapbox(
-    lat=[df_latlong_AED['lat'].iloc[-1]],
-    lon=[df_latlong_AED['lon'].iloc[-1]],
-    mode='markers',
-    name = 'Patient',
-    marker=go.scattermapbox.Marker(
-        size=15,
-        color='red'
-    ),
-    text='Patient',
-    hoverinfo='text' 
+        lat=[df_latlong_AED['lat'].iloc[-1]],
+        lon=[df_latlong_AED['lon'].iloc[-1]],
+        mode='markers',
+        name='Patient',
+        marker=go.scattermapbox.Marker(
+            size=15,
+            color='red'
+        ),
+        text='Patient',
+        hoverinfo='text'
     )
 
     # Add a marker for the AED
     AED_marker = go.Scattermapbox(
-    lat=[AED_coordinates[1]],
-    lon=[AED_coordinates[0]],
-    mode='markers',
-    name = 'AED',
-    marker=go.scattermapbox.Marker(
-        size=15,
-        color='green'
-    ),
-    text='AED device',
-    hoverinfo='text'
+        lat=[AED_coordinates[1]],
+        lon=[AED_coordinates[0]],
+        mode='markers',
+        name='AED',
+        marker=go.scattermapbox.Marker(
+            size=15,
+            color='green'
+        ),
+        text='AED device',
+        hoverinfo='text'
     )
 
     # Add the markers to the figure
@@ -211,7 +215,7 @@ def update_chart(latitude_value, longitude_value):
     updated_fig.add_trace(Patient)
     updated_fig.add_trace(AED_marker)
 
-    return 'Coordinates of the patient (latitude, longitude): (' + str(latitude_value) + ',' + str(longitude_value) +')', updated_fig
+    return 'Coordinates of the patient (latitude, longitude): (' + str(latitude_value) + ',' + str(longitude_value) + ')', updated_fig
 
 if __name__ == '__main__':
     app.run_server(debug=True)
