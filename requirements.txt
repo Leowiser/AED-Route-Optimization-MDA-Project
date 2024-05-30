@@ -4,7 +4,7 @@ geopandas==0.14.3
 geopy==2.4.1
 numpy==1.24.3
 openrouteservice==2.3.3
-pandas==2.0.3
+pandas==2.2.0
 plotly==5.9.0
 pyproj==3.6.1
 Shapely==2.0.4
