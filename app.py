@@ -7,18 +7,16 @@ import pandas as pd
 from dash.dependencies import Input, Output, State
 import plotly.express as px
 from Routing_Class import route
+from FR_Generation_Class import FR_Generation as fr
 
 app = dash.Dash(__name__, title='Zambia MDA Project', external_stylesheets=[dbc.themes.BOOTSTRAP])
 
 route = route()
 
-# Generate 40 random lat and long for responders
-N = 40
-lon_resp = np.random.uniform(4.69, 4.71, N)
-lat_resp = np.random.uniform(50.85, 50.88, N)
-
-# Create dataframe for responders
-responder = pd.DataFrame({'longitude': lon_resp, 'latitude': lat_resp})
+# Generate a realistic dispersion of first responders using FR_Generation_Class
+gdf, pop_df = fr.load_data()
+pop_gdf, location_pop = fr.stat_sec_proportions(gdf, pop_df)
+responder = fr.generate_FRs(pop_gdf, location_pop, proportion=0.005)
 
 # Data of AED-s
 df_aed = pd.read_csv('filtered_AED_loc.csv')    # Cleaned dataset with the locations of the AEDs 
@@ -41,7 +39,7 @@ fig.add_trace(go.Scattermapbox(
     lon=responder['longitude'],
     mode='markers',
     marker=go.scattermapbox.Marker(
-        size=7,
+        size=4,
         color='blue',
         symbol='circle',
         opacity=0.8,
