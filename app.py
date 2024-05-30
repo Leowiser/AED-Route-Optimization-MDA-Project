@@ -119,13 +119,13 @@ app.layout = dbc.Container(
             [
                 dbc.Col(
                     [
+                        dbc.Row(html.Label("Responder proportion")),
+                        dbc.Row(proportion_slider),
+                        html.Div(style={'height': '50px'}),
                         dbc.Row(html.Label("Patient latitude")),
                         dbc.Row(latitude_input),
                         dbc.Row(html.Label("Patient longitude")),
                         dbc.Row(longitude_input),
-                        html.Div(style={'height': '50px'}),
-                        dbc.Row(html.Label("Responder proportion")),
-                        dbc.Row(proportion_slider),
                         html.Div(style={'height': '50px'}),
                         dbc.Row(html.Label("Click button to calculate route")),
                         dbc.Row(html.Button('Click me', id='button'))
