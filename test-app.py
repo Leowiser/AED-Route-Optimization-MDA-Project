@@ -12,7 +12,7 @@ from FR_Generation_Class import FR_Generation as fr
 app = dash.Dash(__name__, title='Zambia MDA Project', external_stylesheets=[dbc.themes.BOOTSTRAP])
 
 ## Required to deploy on Heroku
-# server = app.server
+server = app.server
 
 route = route()
 
