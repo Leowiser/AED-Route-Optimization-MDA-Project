@@ -14,7 +14,10 @@ import plotly.graph_objects as go
 
 class route:
     def __init__(self):
-        self.Client_ors = openrouteservice.Client(key='5b3ce3597851110001cf6248a8348d6a74544602bd7cbc7936c635d1')
+        ## Adam's Key
+        # self.Client_ors = openrouteservice.Client(key='5b3ce3597851110001cf6248a8348d6a74544602bd7cbc7936c635d1')
+        ## Dillon's Key
+        self.Client_ors = openrouteservice.Client(key='5b3ce3597851110001cf6248748ec775959f4a5ea085161e2eef2cd1')
 
     # function to find the AEDs and Responders in a 10 minute walking distance from the patient
     # Nearly same as closest Responders
