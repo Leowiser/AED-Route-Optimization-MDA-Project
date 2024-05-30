@@ -21,13 +21,12 @@ lat_resp = np.random.uniform(50.85, 50.88, N)
 # Create dataframe for responders
 responder = pd.DataFrame({'longitude': lon_resp, 'latitude': lat_resp})
 
-# Generate 10 random lat and long for AEDs
-N = 10
-lon_aed = np.random.uniform(4.69, 4.71, N)
-lat_aed = np.random.uniform(50.85, 50.88, N)
-
-# Create dataframe for AEDs
-aed = pd.DataFrame({'longitude': lon_aed, 'latitude': lat_aed})
+# Data of AED-s
+df_aed = pd.read_csv('filtered_AED_loc.csv')    # Cleaned dataset with the locations of the AEDs 
+AED_longitudes = df_aed['longitude'].values
+AED_latitudes = df_aed['latitude'].values
+aed = list(zip(AED_longitudes, AED_latitudes))    # Zip to one tuple 
+aed = pd.DataFrame(aed, columns=['longitude', 'latitude'])    # Transform aed to dataframe with headings
 
 # Coordinates of Leuven, Belgium
 lat = 50.8798
