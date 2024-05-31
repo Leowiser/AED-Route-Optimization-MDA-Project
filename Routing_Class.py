@@ -99,7 +99,7 @@ class route:
     # The route can be direct or go through other points first
     def directions(self, coordinates, profile = 'foot-walking'):
         client = self.Client_ors
-        time.sleep(1.0)
+        #time.sleep(1.0)
         route = client.directions(coordinates=coordinates,
                                    profile=profile,
                                    format='geojson',
@@ -163,10 +163,23 @@ class route:
         df_merged = pd.merge(Responder_df.assign(key=1), AED_df.assign(key=1),
                         on='key').drop('key', axis=1)
         # Similar as before calculate the distance between AED and the responders.
-        df_merged['dist_AED'] = df_merged.apply(lambda row: geopy.distance.distance(row['Responder_loc'], row['AED_coordinates']).meters, axis=1)
+        df_merged['dist_responder'] = df_merged.apply(lambda row: geopy.distance.distance(row['Responder_loc'], row['AED_coordinates']).meters, axis=1)
+        df_merged['dist_AED'] = df_merged.apply(lambda row: geopy.distance.distance(row['AED_coordinates'], row['Patient_loc']).meters, axis=1)
+        df_merged['dist_throughAED'] = df_merged['dist_responder'] + df_merged['dist_AED']
+
+        if len(df_merged) < 40:
+            df_merged['duration_through_AED']=[self.directions([df_merged['Responder_loc'][i], df_merged['AED_coordinates'][i],df_merged['Patient_loc'][i]])['duration'] for i in range(len(df_merged['dist_AED']))]
+        else:
+            df_merged_else = pd.DataFrame()
+            for i in pd.unique(df_merged['Patient_loc']):
+                subset = df_merged.drop_duplicates(subset=['dist_throughAED']).nsmallest(7,'duration_direct')
+                subset = subset.reset_index(drop = True)
+                df_merged_else = pd.concat([df_merged_else, subset])
+            df_merged = df_merged_else
+            df_merged = df_merged.reset_index(drop=True)
         # If the Responders are closer to the AED than the threshold (by default 700 meters as the bird flies, as this takes around 10 minutes to walk),
         # the duration by foot form the responder through the AED to the patient is calculated and stored in the Data Frame.
-        df_merged['duration_through_AED']=[self.directions([df_merged['Responder_loc'][i], df_merged['AED_coordinates'][i],df_merged['Patient_loc'][i]])['duration'] if df_merged['dist_AED'][i] < threshold else 5000 for i in range(len(df_merged['dist_AED']))]
+        df_merged['duration_through_AED']=[self.directions([df_merged['Responder_loc'][i], df_merged['AED_coordinates'][i],df_merged['Patient_loc'][i]])['duration'] for i in range(len(df_merged['dist_AED']))]
         return df_merged
         
     # Transform a list of lists of coordinates to a data frame with two columns
@@ -202,17 +215,18 @@ class route:
         # Starting decision rule to decide who collects the AED
         # Parameters for caculating the survival probability
         # t_a = Total time for fastest responder to arrive with AED
-        # t_b = Total time for second fastest responder to arrive with AED
+        # t_b = Total time for second fastest direct responder
+        # t_b_aed = Total time for second fastest responder to arrive with AED
         # t_a_no_aed = Time for fastest responder to start CPR without AED
         t_a = df_duration[df_duration['duration_direct']==df_duration.min()['duration_direct']].min()['duration_through_AED']
-        t_b = subset.iloc[subset['duration_direct']==subset.min()['duration_direct']].min()['duration_through_AED']
+        t_b = subset.min()['duration_direct']
         t_b_aed = subset.iloc[subset.idxmin()['duration_through_AED']]['duration_through_AED']  
         t_a_no_aed = df_duration.min()['duration_direct']  
         
         # t_b_CPR = Time of CPR until second fastest responder arrives
         t_a_CPR = (t_a-t_b)
         # t_b_CPR = Time of CPR until second fastest responder arrives
-        t_b_CPR = (t_b-t_a_no_aed)
+        t_b_CPR = (t_b_aed-t_a_no_aed)
 
         # Calculate survival probabilities with function survival_probability
         # - 0.9 ** (x/60) * 0.97 ** (z/60)
@@ -222,13 +236,13 @@ class route:
         # Check if the 2nd fastest direct responder is faster than the fastes direct through AED
         if t_b < t_a:
             # if so, z equal to CPR by 2nd fastest responder
-            surv_A = self.survival_probability(t_a_CPR, t_b)
+            surv_A = self.survival_probability(t_b, t_a_CPR)
         else:
             # - z equals zero as no one does any CPR
             surv_A = self.survival_probability(t_a, 0)
         # 2nd fastest responder arriving with AED
         # - time until AED arrives minus time CPR arrives is the time without CPR
-        surv_B = self.survival_probability(t_b_CPR, t_a_no_aed)
+        surv_B = self.survival_probability(t_a_no_aed, t_b_CPR)
 
         # First check if any responder exist that is not furhter away than 600 seconds
         # DISCUSS
