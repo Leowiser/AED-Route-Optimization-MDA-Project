@@ -21,7 +21,7 @@ class route:
 
     # function to find the AEDs and Responders in a 10 minute walking distance from the patient
     # Nearly same as closest Responders
-    def closest_location(self, Patient, Location, profile = "foot-walking", threshold = 600):
+    def closest_location(self, Patient, Location, profile = "foot-walking", threshold = 900):
         # patient must be a tuple
         # AEDS must be a dataframe with columns (This is gathered in another file) named latitude and longitude
         # profile by default is walking by foot
@@ -123,7 +123,7 @@ class route:
     # Function to get all possible routes through the AEDs that are close to the patient
     # Returns a data frame with the coordinates of the Responder, duration through the specific AED,
     # duration for the direct route, and the coordinates of the used AED
-    def possible_routing(self, Patient, Responders, AEDs, threshold = 600):
+    def possible_routing(self, Patient, Responders, AEDs, threshold = 900):
         if len(Responders) < 3:    # If there are less than 3 responders in total (unrealistic case)
             Responders_loc = self.closest_location(Patient, Responders, threshold=10000)    # Set a high threshold
         else:
