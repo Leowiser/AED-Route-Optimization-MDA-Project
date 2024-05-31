@@ -361,3 +361,97 @@ class simulation:
         df = pd.DataFrame(dict)
         
         return df
+    
+
+     # Function to build a data frame with the fastest direct and indirect for first responders
+    def fastest_fcr_aed(self, Patient, Responder_loc, AED_loc, index):
+        # df need an index, also nice to sav elike that for each patient 
+        Patient = pd.DataFrame(Patient)
+        Patient = Patient.transpose()
+        Patient = Patient.reset_index(drop = True)
+        Responder_df = pd.DataFrame(Responder_loc)
+        Responder_df.rename(columns = {'coordinates':'Responder_loc'}, inplace = True)
+        Responder_df['Patient_lon'] = Patient.loc[0, ('longitude')]
+        Responder_df['Patient_lat']  = Patient.loc[0, ('latitude')]
+        Responder_df['Patient_loc'] = list(zip(Responder_df['Patient_lon'],Responder_df['Patient_lat']))
+        Responder_df['dist_patient'] = Responder_df.apply(lambda row: geopy.distance.distance(row['Responder_loc'], row['Patient_loc']).meters, axis=1)
+        # only keep the 15 closest responders. keep='all' so that more that all responders with the 10 lowest values are kept.        
+        subset_responder = Responder_df.nsmallest(15, 'dist_patient', keep='all')
+        subset_responder['duration_direct']=[self.directions([i, Patient_cood])['duration'] for i,
+                                             Patient_cood in zip(subset_responder['Responder_loc'], subset_responder['Patient_loc'])]
+        # select the fastest overall time
+        # reset the index of the subset to make indexing possible again
+        subset_responder = subset_responder.reset_index(drop = True)
+        print('Duration for responders found')
+
+        print('You did a lot take a 30 second break.')
+        time.sleep(30.0)
+        AED_df = pd.DataFrame(AED_loc)
+        AED_df.rename(columns = {'coordinates':'AED_coordinates'}, inplace = True)
+        df_merged = pd.merge(subset_responder.assign(key=1), AED_df.assign(key=1),
+                        on='key').drop('key', axis=1)
+        df_merged['dist_AED'] = df_merged.apply(lambda row: geopy.distance.distance(row['Responder_loc'], row['AED_coordinates']).meters, axis=1)
+        
+        df_merged['duration_through_AED']=[self.directions([df_merged['Responder_loc'][i], df_merged['AED_coordinates'][i],
+                                                            df_merged['Patient_loc'][i]], sleep = 2.0)['duration']  if df_merged['dist_AED'][i] < 700 else 5000 for i in range(len(df_merged['dist_AED']))]
+        print('Duration for AEDs found')
+
+         # coordinate of the Responder with the fastest direct time and the one with the fastest time through an AED
+        coord_direct = df_merged.iloc[df_merged.idxmin()['duration_direct']]['Responder_loc']
+        coord_AED = df_merged.iloc[df_merged.idxmin()['duration_through_AED']]['Responder_loc']
+        # coordinates of the AED with the second fastest route
+        subset = df_merged[(df_merged['duration_direct']>df_merged.min()['duration_direct']) & (df_merged['duration_direct']>df_merged.min()['duration_direct'])]
+        
+        # Check if the fastest response time with AED is only slightly slower/faster than the direct routing and how different it is
+        # for the second fastest
+        dif_AED_direct = df_merged[df_merged['duration_direct']==df_merged.min()['duration_direct']].min()['duration_through_AED'] - df_merged.min()['duration_direct']
+        # difference between fastest and second fastest direct way
+        dif_2nd_1st_direct = df_merged.iloc[df_merged.drop_duplicates(subset=['Responder_loc']).nsmallest(2,'duration_direct').index[1]]['duration_direct'] - df_merged.min()['duration_direct']
+
+        # Now check if the fastest through AED is the same as the fastest direct 
+        if coord_direct == coord_AED:
+            print('Fastest Direct and Indirect are the same')
+            # Check if the difference between direct route and route through AED is miner (less than 30 seconds)
+            # and if the difference between second fastest direct and the fastest direct is not to big (60 seconds)
+            # This is done because time is of essence and otherwise the fast responder could be left out
+            if ((dif_AED_direct < 30) and(dif_2nd_1st_direct < 60)):
+                # If both is true:
+                # - Second fastest direct time will be send directly
+                # - Fastest direct and AED responder will be send through the AED
+                coord_direct = (df_merged.iloc[df_merged.drop_duplicates(subset=['Responder_loc']).nsmallest(2,'duration_direct').index[1]]['duration_direct'])
+                coord_AED =  df_merged.iloc[df_merged.idxmin()['duration_direct']]['Responder_loc']
+                AED_coordinates = df_merged.iloc[df_merged.idxmin()['duration_direct']]['AED_coordinates']
+                fastest_Responder = df_merged.iloc[df_merged.drop_duplicates(subset=['Responder_loc']).nsmallest(2,'duration_direct').index[1]]['duration_direct']
+                fastest_AED = df_merged[df_merged['duration_direct']==df_merged.min()['duration_direct']].min()['duration_through_AED']
+            else:
+                # If this is not true:
+                # - Fastes direct responder will be send directly
+                # - Second fastest through AED responder will be send through the AED                
+                coord_direct = coord_direct
+                coord_AED = subset.iloc[subset.idxmin()['duration_through_AED']]['AED_coordinates']
+                AED_coordinates = subset.iloc[subset.idxmin()['duration_through_AED']]['AED_coordinates']
+                fastest_Responder = df_merged.iloc[df_merged.idxmin()['duration_direct']]['duration_direct']
+                fastest_AED = subset.iloc[subset.idxmin()['duration_through_AED']]['duration_through_AED']
+        else:
+            print('Fastest Direct and Indirect are not the same')
+            # If the fastest direct responder and thorugh AED responder are different:
+            # - Take the fastest responders for both
+            coord_direct = coord_direct
+            coord_AED = coord_AED
+            fastest_Responder = df_merged.iloc[df_merged.idxmin()['duration_direct']]['duration_direct']
+            fastest_AED = df_merged.iloc[df_merged.idxmin()['duration_through_AED']]['duration_through_AED']        
+
+        lat_Responder = coord_direct[1]
+        lon_Responder = coord_direct[0]
+        lat_AED = coord_AED[1]
+        lon_AED = coord_AED[0]
+
+        print('Time to sleep even longer otherwise the API gets tired.')
+        time.sleep(300)
+        
+        dict = {'Responder_lon':lon_Responder, 'Responder_lat':lat_Responder, 
+                'duration_Responder':fastest_Responder, 'AED_lon':lon_AED, 
+                'AED_lat':lat_AED,'duration_AED':fastest_AED}
+        df = pd.DataFrame(dict, index=[index])
+        
+        return df
