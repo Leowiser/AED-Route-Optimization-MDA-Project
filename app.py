@@ -10,6 +10,9 @@ from FR_Generation_Class import FR_Generation as fr
 
 app = dash.Dash(__name__, title='Zambia MDA Project', external_stylesheets=[dbc.themes.BOOTSTRAP])
 
+## required for app deployment
+server = app.server
+
 # Initiate a route object from the Routing_class
 route = route()
 
