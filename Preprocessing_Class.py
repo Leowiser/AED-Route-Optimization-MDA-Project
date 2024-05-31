@@ -110,15 +110,6 @@ class AEDPreprocessor:
         return self.aed_gdf
 
 
-# In[6]:
-
-
-# Paths and API Key
-aed_file_path = "C:/Users/xuzhe/Downloads/aed_locations.parquet.gzip"
-mapping_file_path = "C:/Users/xuzhe/Downloads/AED Mapping.csv"
-api_key = "AIzaSyC_Pv0ruQnUweyVrrJtycdctriz7yypgvM"
-
-
 # In[ ]:
 
 
