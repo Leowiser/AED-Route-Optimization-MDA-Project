@@ -253,7 +253,7 @@ class route:
 
         # First check if any responder exist that is not furhter away than 600 seconds
         # DISCUSS
-        if df_duration[df_duration['duration_direct']<1200].any()['duration_direct'] and df_duration[df_duration['duration_through_AED']<1200].any()['duration_through_AED']:
+        if df_duration[df_duration['duration_direct']<2000].any()['duration_direct'] and df_duration[df_duration['duration_through_AED']<2000].any()['duration_through_AED']:
             # Now check if the fastest through AED is the same as the fastest direct 
             if lat_direct==lat_AED and lon_direct==lon_AED:
                 # Find best strategy which is the maximal survival chances
