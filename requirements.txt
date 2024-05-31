@@ -1,0 +1,11 @@
+dash==2.14.2
+dash_bootstrap_components
+geopandas
+geopy
+numpy
+openrouteservice
+pandas
+plotly
+pyproj
+Shapely
+gunicorn
