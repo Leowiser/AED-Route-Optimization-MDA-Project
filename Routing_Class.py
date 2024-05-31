@@ -146,7 +146,7 @@ class route:
         # get the distance between responders and patients
         Responder_df['dist_patient'] = Responder_df.apply(lambda row: geopy.distance.distance(row['Responder_loc'], row['Patient_loc']).meters, axis=1)
         # only keep the 5 closest responders. keep='all' so that more that all responders with the 5 lowest values are kept.
-        Responder_df = Responder_df.nsmallest(5, 'dist_patient', keep='all')
+        Responder_df = Responder_df.nsmallest(5, 'dist_patient')#, keep='all'
         Responder_df = Responder_df.reset_index(drop=True)
         Responder_df['duration_direct']=[self.directions([i, Patient_cood], profile = 'foot-walking')['duration'] for i, 
                                           Patient_cood in zip(Responder_df['Responder_loc'], Responder_df['Patient_loc'])]
@@ -179,11 +179,11 @@ class route:
         # Now also the distance between AED and Patient is taken
         df_merged['dist_throughAED'] = df_merged['dist_responder'] + df_merged['dist_AED']
 
-        if len(df_merged) < 40:
-            df_merged['duration_through_AED']=[self.directions([df_merged['Responder_loc'][i], df_merged['AED_coordinates'][i],df_merged['Patient_loc'][i]])['duration'] for i in range(len(df_merged['dist_AED']))]
-        else:
-            subset = [df_merged[df_merged['Responder_loc']==i].nsmallest(7,'dist_throughAED').reset_index(drop = True) for i in pd.unique(df_merged['Responder_loc'])]
-            df_merged = pd.concat(subset).reset_index(drop=True)
+#        if len(df_merged) < 40:
+#            df_merged['duration_through_AED']=[self.directions([df_merged['Responder_loc'][i], df_merged['AED_coordinates'][i],df_merged['Patient_loc'][i]])['duration'] for i in range(len(df_merged['dist_AED']))]
+#        else:
+        subset = [df_merged[df_merged['Responder_loc']==i].nsmallest(6,'dist_throughAED').reset_index(drop = True) for i in pd.unique(df_merged['Responder_loc'])]
+        df_merged = pd.concat(subset).reset_index(drop=True)
         # If the Responders are closer to the AED than the threshold (by default 700 meters as the bird flies, as this takes around 10 minutes to walk),
         # the duration by foot form the responder through the AED to the patient is calculated and stored in the Data Frame.
         df_merged['duration_through_AED']=[self.directions([df_merged['Responder_loc'][i], df_merged['AED_coordinates'][i],df_merged['Patient_loc'][i]])['duration'] for i in range(len(df_merged['dist_AED']))]
