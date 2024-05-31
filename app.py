@@ -196,10 +196,10 @@ def update_chart(n_clicks, proportion, latitude_value, longitude_value):
             name='Responders'
         ))
 
-        # Add a "default" patient to the middle of Leuven 
+        # Add a the patient to the plot (to where it was before if it was set, or to the middle of Leuven)
         fig.add_trace(go.Scattermapbox(
-            lat=[lat],
-            lon=[lon],
+            lat=[latitude_value],
+            lon=[longitude_value],
             mode='markers',
             marker=go.scattermapbox.Marker(
                 size=10,
