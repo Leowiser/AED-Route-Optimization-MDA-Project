@@ -11,9 +11,9 @@ class FR_Generation:
     
     def load_data():
         # read in the geospatial data for the statistical sectors of Belgium
-        gdf = gpd.read_file("Data/leuven.shp")
+        gdf = gpd.read_file("Data\leuven.shp")
         # reading in statistical sector data which contains populations counts
-        pop_df = pd.read_csv("Data/leuven.csv")
+        pop_df = pd.read_csv("Data\leuven.csv")
         return gdf, pop_df
              
     def stat_sec_proportions(gdf, pop_df, coord_system=4326):      
