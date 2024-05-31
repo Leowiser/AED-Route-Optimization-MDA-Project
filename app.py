@@ -10,6 +10,9 @@ from FR_Generation_Class import FR_Generation as fr
 
 app = dash.Dash(__name__, title='Zambia MDA Project', external_stylesheets=[dbc.themes.BOOTSTRAP])
 
+## required for app deployment
+server = app.server
+
 # Initiate a route object from the Routing_class
 route = route()
 
@@ -323,7 +326,7 @@ def update_chart(n_clicks, proportion, latitude_value, longitude_value):
         updated_fig.add_trace(Patient)
         updated_fig.add_trace(AED_marker)
 
-        return f'Time to arrive for direct responder: {round(direct_route["duration"]/60, 1)} mins', f'time to arrive for responder through AED: {round(AED_route["duration"]/60, 1)} mins', updated_fig
+        return f'Time to arrive for direct responder: {round(direct_route["duration"]/60, 1)} mins', f'Time to arrive for responder through AED: {round(AED_route["duration"]/60, 1)} mins', updated_fig
 
 if __name__ == '__main__':
     app.run_server(debug=True)
