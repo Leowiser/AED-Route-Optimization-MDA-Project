@@ -10,6 +10,7 @@ from FR_Generation_Class import FR_Generation as fr
 
 app = dash.Dash(__name__, title='Zambia MDA Project', external_stylesheets=[dbc.themes.BOOTSTRAP])
 
+# Initiate a route object from the Routing_class
 route = route()
 
 # Generate a realistic dispersion of first responders using FR_Generation_Class
@@ -34,7 +35,7 @@ aed = pd.DataFrame(aed, columns=['longitude', 'latitude'])  # Transform aed to d
 lat = 50.8798
 lon = 4.7005
 
-# Create a map figure
+# Create a map figure visualizing the AEDs
 fig = go.Figure(go.Scattermapbox(
     lat=aed['latitude'],
     lon=aed['longitude'],
@@ -60,6 +61,7 @@ fig.add_trace(go.Scattermapbox(
     name='Responders'
 ))
 
+# Add a "default" patient to the middle of Leuven
 fig.add_trace(go.Scattermapbox(
     lat=[lat],
     lon=[lon],
@@ -73,7 +75,7 @@ fig.add_trace(go.Scattermapbox(
     name='Patient'
 ))
 
-# Update layout to use mapbox style and set initial zoom level
+# Update layout for nicer design
 fig.update_layout(
     mapbox_style="carto-positron",
     mapbox_center={"lat": lat, "lon": lon},
@@ -102,7 +104,7 @@ longitude_input = dcc.Input(
     style={'width': '100%'}
 )
 
-# Slider for adjusting the proportion of responders
+# Slider for adjusting the proportion of responders - user input
 proportion_slider = dcc.Slider(
     id='proportion_slider',
     min=0.001,
@@ -113,12 +115,14 @@ proportion_slider = dcc.Slider(
     tooltip={"placement": "bottom", "always_visible": True}
 )
 
+# Design the app
 app.layout = dbc.Container(
     [
         html.Div(
             children=[
                 html.H1(children='AED & Responder route optimization'),
-                html.H2(children='Please wait while the figure updates...', id='id_title')
+                html.H2(children='Default title 1', id='id_title'),
+                html.H2(children='Default title 2', id='id_title2')
             ],
             style={'textAlign': 'center', 'color': 'black'}
         ),
@@ -150,6 +154,7 @@ app.layout = dbc.Container(
 
 @app.callback(
     [Output('id_title', 'children'),
+     Output('id_title2', 'children'),
      Output('id_graph', 'figure')],
     [Input('button', 'n_clicks'),
      Input('proportion_slider', 'value')],
@@ -161,8 +166,8 @@ def update_chart(n_clicks, proportion, latitude_value, longitude_value):
     ctx = dash.callback_context
 
     if not ctx.triggered:
-        # Initial rendering
-        return f'Coordinates of the patient (latitude, longitude): ({lat}, {lon})', fig
+        # Default state of the app - without any callback triggered yet
+        return f'Adjust the responder ratio and patient coordinate parameters on the left', 'Click the button on the bottom after changing patient coordinates!', fig
 
     trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
 
@@ -172,8 +177,9 @@ def update_chart(n_clicks, proportion, latitude_value, longitude_value):
         responder = generate_responders(proportion)
 
         # Update the figure with new responders
-        fig.data = [fig.data[0]]    # Keep only AED locations
-
+        fig.data = [fig.data[0]]    # First, keep only the AED locations
+        
+        # Add the responders again to the map now based on the updated responder proportion
         fig.add_trace(go.Scattermapbox(
             lat=responder['latitude'],
             lon=responder['longitude'],
@@ -184,9 +190,10 @@ def update_chart(n_clicks, proportion, latitude_value, longitude_value):
                 symbol='circle',
                 opacity=0.8,
             ),
-            name='Responder'
+            name='Responders'
         ))
 
+        # Add a "default" patient to the middle of Leuven 
         fig.add_trace(go.Scattermapbox(
             lat=[lat],
             lon=[lon],
@@ -199,8 +206,11 @@ def update_chart(n_clicks, proportion, latitude_value, longitude_value):
             ),
             name='Patient'
         ))
+        
+        # Update layout so that the map is centered at the middle of Leuven
+        fig.update_layout(mapbox_center={"lat": lat, "lon": lon})
 
-        return f'Coordinates of the patient (latitude, longitude): ({latitude_value}, {longitude_value})', fig
+        return f'Responders are generated assuming {round(proportion*100, 2)}% of the population is a first responder','Click the button on the bottom after changing patient coordinates!', fig
 
     if trigger_id == 'button':
         # Get coordinates of the optimal first-and second responder's and AED's location
@@ -219,7 +229,7 @@ def update_chart(n_clicks, proportion, latitude_value, longitude_value):
         df_latlong_AED = route.get_coordinates(AED_route['coordinates'])
 
         # "Reset" the plot to keep only the AED locations
-        fig.data = [fig.data[0]]    # Keep only AED locations
+        fig.data = [fig.data[0]]    # First, keep only the AED locations
 
         # Add responders back to the map
         fig.add_trace(go.Scattermapbox(
@@ -232,12 +242,12 @@ def update_chart(n_clicks, proportion, latitude_value, longitude_value):
                 symbol='circle',
                 opacity=0.8,
             ),
-            name='Responder'
+            name='Responders'
         ))
 
         # Plot the new patient location (after user changed input)
         updated_fig = fig.update_traces(lat=[latitude_value], lon=[longitude_value], selector=dict(name='Patient'))
-        updated_fig.update_layout(mapbox_center={"lat": latitude_value, "lon": longitude_value})  # center plot around the new coordinates
+        updated_fig.update_layout(mapbox_center={"lat": latitude_value, "lon": longitude_value})    # center plot around the new coordinates
 
         # plot the direct way - first responder to patient
         direct_trace = px.line_mapbox(df_latlong_direct, lat="lat", lon="lon").data[0]
@@ -261,7 +271,7 @@ def update_chart(n_clicks, proportion, latitude_value, longitude_value):
                 size=10,
                 color='darkblue'
             ),
-            text='First responder direct',  # Text to display when hovering over the marker
+            text='First responder direct',
             hoverinfo='text'
         )
 
@@ -313,7 +323,7 @@ def update_chart(n_clicks, proportion, latitude_value, longitude_value):
         updated_fig.add_trace(Patient)
         updated_fig.add_trace(AED_marker)
 
-        return f'Coordinates of the patient (latitude, longitude): ({latitude_value}, {longitude_value})', updated_fig
+        return f'Time to arrive for direct responder: {round(direct_route["duration"]/60, 1)} mins', f'time to arrive for responder through AED: {round(AED_route["duration"]/60, 1)} mins', updated_fig
 
 if __name__ == '__main__':
     app.run_server(debug=True)
