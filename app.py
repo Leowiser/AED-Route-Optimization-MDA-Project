@@ -210,7 +210,7 @@ def update_chart(n_clicks, proportion, latitude_value, longitude_value):
         # Update layout so that the map is centered at the middle of Leuven
         fig.update_layout(mapbox_center={"lat": lat, "lon": lon})
 
-        return f'Responders are generated assuming {round(proportion*100, 2)}% of the population is a first responder','Click the button on the bottom after changing patient coordinates!', fig
+        return f'Responders are generated assuming {round(proportion*100, 2)}% of the population is a first responder','Click the button at the bottom after changing patient coordinates!', fig
 
     if trigger_id == 'button':
         # Get coordinates of the optimal first-and second responder's and AED's location
