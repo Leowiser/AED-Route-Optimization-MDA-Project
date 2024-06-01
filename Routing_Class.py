@@ -146,7 +146,7 @@ class route:
         # get the distance between responders and patients
         Responder_df['dist_patient'] = Responder_df.apply(lambda row: geopy.distance.distance(row['Responder_loc'], row['Patient_loc']).meters, axis=1)
         # only keep the 5 closest responders. keep='all' so that more that all responders with the 5 lowest values are kept.
-        Responder_df = Responder_df.nsmallest(5, 'dist_patient', keep='all')
+        Responder_df = Responder_df.nsmallest(5, 'dist_patient')#, keep='all'
         Responder_df = Responder_df.reset_index(drop=True)
         Responder_df['duration_direct']=[self.directions([i, Patient_cood], profile = 'foot-walking')['duration'] for i, 
                                           Patient_cood in zip(Responder_df['Responder_loc'], Responder_df['Patient_loc'])]
@@ -174,20 +174,15 @@ class route:
                         on='key').drop('key', axis=1)
         # Similar as before calculate the distance between AED and the responders.
         df_merged['dist_responder'] = df_merged.apply(lambda row: geopy.distance.distance(row['Responder_loc'], row['AED_coordinates']).meters, axis=1)
+        # And the distance between the Patient and the AED
         df_merged['dist_AED'] = df_merged.apply(lambda row: geopy.distance.distance(row['AED_coordinates'], row['Patient_loc']).meters, axis=1)
+        # Now the two are added together
         df_merged['dist_throughAED'] = df_merged['dist_responder'] + df_merged['dist_AED']
 
-        if len(df_merged) < 40:
-            df_merged['duration_through_AED']=[self.directions([df_merged['Responder_loc'][i], df_merged['AED_coordinates'][i],df_merged['Patient_loc'][i]])['duration'] for i in range(len(df_merged['dist_AED']))]
-        else:
-            df_merged_else = pd.DataFrame()
-            for i in pd.unique(df_merged['Responder_loc']):
-                subset = df_merged[df_merged['Responder_loc']==i].nsmallest(7,'dist_throughAED').reset_index(drop = True)
-                df_merged_else = pd.concat([df_merged_else, subset])
-        df_merged = df_merged_else
-        df_merged = df_merged.reset_index(drop = True)
-        # If the Responders are closer to the AED than the threshold (by default 700 meters as the bird flies, as this takes around 10 minutes to walk),
-        # the duration by foot form the responder through the AED to the patient is calculated and stored in the Data Frame.
+        # Based on the combined distance, the six shortest distances for every of the five responders are selected
+        subset = [df_merged[df_merged['Responder_loc']==i].nsmallest(6,'dist_throughAED').reset_index(drop = True) for i in pd.unique(df_merged['Responder_loc'])]
+        df_merged = pd.concat(subset).reset_index(drop=True)
+        # The duration by foot from the responder through the AED to the patient is calculated and stored in the Data Frame.
         df_merged['duration_through_AED']=[self.directions([df_merged['Responder_loc'][i], df_merged['AED_coordinates'][i],df_merged['Patient_loc'][i]])['duration'] for i in range(len(df_merged['dist_AED']))]
         return df_merged
         
@@ -253,35 +248,33 @@ class route:
         # - time until AED arrives minus time CPR arrives is the time without CPR
         surv_B = self.survival_probability(t_a_no_aed, t_b_CPR)
 
-        # First check if any responder exist that is not furhter away than 600 seconds
-        # DISCUSS
-        if df_duration[df_duration['duration_direct']<1200].any()['duration_direct'] and df_duration[df_duration['duration_through_AED']<1200].any()['duration_through_AED']:
-            # Now check if the fastest through AED is the same as the fastest direct 
-            if lat_direct==lat_AED and lon_direct==lon_AED:
-                # Find best strategy which is the maximal survival chances
-                best_strategy = max(surv_A, surv_B)
-                # Send responders
-                if best_strategy == surv_A:
-                    # - Second fastest direct time will be send directly  
-                    # - Fastest direct and AED responder will be send through the AED
-                    coord_direct = (df_duration.iloc[df_duration.drop_duplicates(subset=['Responder_loc']).nsmallest(2,'duration_direct').index[1]]['longitude'], df_duration.iloc[df_duration.drop_duplicates(subset=['Responder_loc']).nsmallest(2,'duration_direct').index[1]]['latitude'])
-                    coord_AED =  (lon_direct, lat_direct)
-                    AED_coordinates = df_duration.iloc[df_duration.idxmin()['duration_direct']]['AED_coordinates']
-                # If this is not true:
-                # - Fastes direct responder will be send directly
-                # - Second fastest through AED responder will be send through the AED
-                else:
-                    coord_direct = (lon_direct, lat_direct)
-                    lat_AED_2nd = subset.iloc[subset.idxmin()['duration_through_AED']]['latitude']
-                    lon_AED_2nd = subset.iloc[subset.idxmin()['duration_through_AED']]['longitude']
-                    coord_AED = (lon_AED_2nd, lat_AED_2nd)
-                    AED_coordinates = subset.iloc[subset.idxmin()['duration_through_AED']]['AED_coordinates']
+
+        # Check if the fastest through AED is the same as the fastest direct 
+        if lat_direct==lat_AED and lon_direct==lon_AED:
+            # Find best strategy which is the maximal survival chances
+            best_strategy = max(surv_A, surv_B)
+            # Send responders
+            if best_strategy == surv_A:
+                # - Second fastest direct time will be send directly  
+                # - Fastest direct and AED responder will be send through the AED
+                coord_direct = (df_duration.iloc[df_duration.drop_duplicates(subset=['Responder_loc']).nsmallest(2,'duration_direct').index[1]]['longitude'], df_duration.iloc[df_duration.drop_duplicates(subset=['Responder_loc']).nsmallest(2,'duration_direct').index[1]]['latitude'])
+                coord_AED =  (lon_direct, lat_direct)
+                AED_coordinates = df_duration.iloc[df_duration.idxmin()['duration_direct']]['AED_coordinates']
+            # If this is not true:
+            # - Fastes direct responder will be send directly
+            # - Second fastest through AED responder will be send through the AED
             else:
-                # If the fastest direct responder and thorugh AED responder are different:
-                # - Take the fastest responders for both
                 coord_direct = (lon_direct, lat_direct)
-                coord_AED = (lon_AED, lat_AED)
-                AED_coordinates = df_duration.iloc[df_duration.idxmin()['duration_through_AED']]['AED_coordinates']
+                lat_AED_2nd = subset.iloc[subset.idxmin()['duration_through_AED']]['latitude']
+                lon_AED_2nd = subset.iloc[subset.idxmin()['duration_through_AED']]['longitude']
+                coord_AED = (lon_AED_2nd, lat_AED_2nd)
+                AED_coordinates = subset.iloc[subset.idxmin()['duration_through_AED']]['AED_coordinates']
+        else:
+            # If the fastest direct responder and thorugh AED responder are different:
+            # - Take the fastest responders for both
+            coord_direct = (lon_direct, lat_direct)
+            coord_AED = (lon_AED, lat_AED)
+            AED_coordinates = df_duration.iloc[df_duration.idxmin()['duration_through_AED']]['AED_coordinates']
         
         return {'coord_direct': coord_direct, 'coord_AED': coord_AED, 'AED_coordinates': AED_coordinates}
     
