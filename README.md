@@ -3,6 +3,7 @@ This is the repository of the Zambia group of the course Modern Data Analytics a
 
 The repository includes all files neede to create and run the App. It also includes all files to reproduce the report.
 
+**!!! The App can only be used once per minute !!!**
 [Click here to acces the App](https://aed-route-optimization-mda-project.onrender.com/)
 
 ## Preprocessing_Class.py
