@@ -150,10 +150,6 @@ class route:
         Responder_df = Responder_df.reset_index(drop=True)
         Responder_df['duration_direct']=[self.directions([i, Patient_cood], profile = 'foot-walking')['duration'] for i, 
                                           Patient_cood in zip(Responder_df['Responder_loc'], Responder_df['Patient_loc'])]
-        # if the distance is lower than the threshold (default is 700 meters), the foot walking distance is calculated and otherwise the value
-        # is set to a high value.
-        # This is done to minimize the amount the API is used as this is restricted in the free version
-        # Responder_df['duration_direct']=[self.directions([i, Patient])['duration'] if d<threshold else 5000 for i, d in zip(Responder_df['Responder_loc'], Responder_df['dist_patient'])]
 
         # Duration through AED
         if len(AEDs) < 3:    # If there are less than 3 AEDs in total (unrealistic case)
