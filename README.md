@@ -11,7 +11,7 @@ The repository includes all files needed to create and run the App. It also incl
 Cleans the given AED data in Leuven and finds their coordinates.
 
 ## FR_Genration_Class.py
-This class generates the first responders in Leuven (Data/Leuven.shp) based on the population density of different Leuven area Data/leuven.csv. The first responders are genrated as a share of the total population.
+This class generates first responders in Leuven using two datasets: a geodataset of the statistical sectors of Leuven (Data/Leuven.shp) and a dataset containing the population information for these statistical sectors (Data/leuven.csv). The number of first responders is generated as a share of the total population. These first responders are then spread among the statistical sectors of Leuven according the to sectors' population density. Areas with higher population density will receive have a higher density of first responders.
 
 The class is used in the app.py as well as to create the data for the simulations of the effect of our App.
 
