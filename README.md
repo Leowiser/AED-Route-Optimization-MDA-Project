@@ -1,7 +1,7 @@
 # MDA_2024_Zambia
 This is the repository of the Zambia group of the course Modern Data Analytics at the KU Leuven. The goal of the Project was to develop an App that optimizes and visualizes routes of community first responders in the city of Leuven, to maximize survival chances in the case of a cardiac arrest.
 
-The repository includes all files neede to create and run the App. It also includes all files to reproduce the report.
+The repository includes all files needed to create and run the App. It also includes all files to reproduce the report.
 
 **!!! The App can only be used once per minute !!!**
 
