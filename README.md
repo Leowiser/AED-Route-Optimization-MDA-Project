@@ -4,6 +4,7 @@ This is the repository of the Zambia group of the course Modern Data Analytics a
 The repository includes all files neede to create and run the App. It also includes all files to reproduce the report.
 
 **!!! The App can only be used once per minute !!!**
+
 [Click here to acces the App](https://aed-route-optimization-mda-project.onrender.com/)
 
 ## Preprocessing_Class.py
@@ -31,6 +32,8 @@ Class to simulate responder dispatch and compares their response time to the one
 Class to find the survival chances of a patient based on the arrival of the responders and vectors. 
 
 ### Simulations_Survivability
+**!! Must be run over serveral days to not strain the API to much !!**
+
 Uses the Simulation_Class.py simulation class to simulate the time that was needed for first responders to reach all observed 81 cardiac arrest from the year 2022-2023. The simulations are conducted with 0.5% and 1% of the population as responders.
 
 ### sim_plot.ipynb
