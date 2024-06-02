@@ -31,6 +31,10 @@ Class to simulate responder dispatch and compares their response time to the one
 ## Survival_prob_Class_py
 Class to find the survival chances of a patient based on the arrival of the responders and vectors. 
 
+## Simulation_Survival folder
+### data_interventions
+Cleans the interventions data to only include the cardiac arrests in Leuven on which we want to conduct the simulation.
+
 ### Simulations_Survivability
 **!! Must be run over serveral days to not strain the API to much !!**
 
