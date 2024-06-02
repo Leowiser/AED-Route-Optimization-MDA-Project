@@ -35,6 +35,8 @@ Uses the Simulation_Class.py simulation class to simulate the time that was need
 ### sim_plot.ipynb
 Utilizes the Survival_prob_Class.py probability_survival function to calculate the survival of the simulated patients from Simulations_Survivability. 
 
+------
+
 # Extra Folders
 ## Test_Classes
 Folder with tests for the route and survival probability class.
