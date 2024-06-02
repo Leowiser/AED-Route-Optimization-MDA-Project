@@ -1,9 +1,9 @@
 # MDA_2024_Zambia
 This is the repository of the Zambia group of the course Modern Data Analytics at the KU Leuven. The goal of the Project was to develop an App that optimizes and visualizes routes of community first responders in the city of Leuven, to maximize survival chances in the case of a cardiac arrest.
 
-The repository includes all files neede to create and run the App.
+The repository includes all files neede to create and run the App. It also includes all files to reproduce the report.
 
-It also includes all files to reproduce the report.
+[Click here to acces the App](https://aed-route-optimization-mda-project.onrender.com/)
 
 ## Preprocessing_Class.py
 Cleans the given AED data in Leuven and finds their coordinates.
