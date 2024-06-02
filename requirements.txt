@@ -8,6 +8,6 @@ openrouteservice==2.3.3
 pandas==2.2.0
 plotly==5.9.0
 pyproj==3.6.1
-requests==2.24.0
+requests==2.31.0
 Shapely==2.0.4
 gunicorn==22.0.0
