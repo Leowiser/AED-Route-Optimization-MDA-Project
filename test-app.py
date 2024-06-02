@@ -22,7 +22,7 @@ pop_gdf, location_pop = fr.stat_sec_proportions(gdf, pop_df)
 responder = fr.generate_FRs(pop_gdf, location_pop, proportion=0.0005)
 
 # Data of AED-s
-df_aed = pd.read_csv('filtered_AED_loc.csv')    # Cleaned dataset with the locations of the AEDs 
+df_aed = pd.read_csv('Data/filtered_AED_loc.csv')    # Cleaned dataset with the locations of the AEDs 
 AED_longitudes = df_aed['longitude'].values
 AED_latitudes = df_aed['latitude'].values
 aed = list(zip(AED_longitudes, AED_latitudes))    # Zip to one tuple 

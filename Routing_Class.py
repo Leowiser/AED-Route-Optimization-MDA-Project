@@ -174,18 +174,15 @@ class route:
                         on='key').drop('key', axis=1)
         # Similar as before calculate the distance between AED and the responders.
         df_merged['dist_responder'] = df_merged.apply(lambda row: geopy.distance.distance(row['Responder_loc'], row['AED_coordinates']).meters, axis=1)
-        # And the distance between the Pateient and the AED
+        # And the distance between the Patient and the AED
         df_merged['dist_AED'] = df_merged.apply(lambda row: geopy.distance.distance(row['AED_coordinates'], row['Patient_loc']).meters, axis=1)
-        # Now also the distance between AED and Patient is taken
+        # Now the two are added together
         df_merged['dist_throughAED'] = df_merged['dist_responder'] + df_merged['dist_AED']
 
-#        if len(df_merged) < 40:
-#            df_merged['duration_through_AED']=[self.directions([df_merged['Responder_loc'][i], df_merged['AED_coordinates'][i],df_merged['Patient_loc'][i]])['duration'] for i in range(len(df_merged['dist_AED']))]
-#        else:
+        # Based on the combined distance, the six shortest distances for every of the five responders are selected
         subset = [df_merged[df_merged['Responder_loc']==i].nsmallest(6,'dist_throughAED').reset_index(drop = True) for i in pd.unique(df_merged['Responder_loc'])]
         df_merged = pd.concat(subset).reset_index(drop=True)
-        # If the Responders are closer to the AED than the threshold (by default 700 meters as the bird flies, as this takes around 10 minutes to walk),
-        # the duration by foot form the responder through the AED to the patient is calculated and stored in the Data Frame.
+        # The duration by foot from the responder through the AED to the patient is calculated and stored in the Data Frame.
         df_merged['duration_through_AED']=[self.directions([df_merged['Responder_loc'][i], df_merged['AED_coordinates'][i],df_merged['Patient_loc'][i]])['duration'] for i in range(len(df_merged['dist_AED']))]
         return df_merged
         
@@ -275,11 +272,17 @@ class route:
                     coord_AED = (lon_AED_2nd, lat_AED_2nd)
                     AED_coordinates = subset.iloc[subset.idxmin()['duration_through_AED']]['AED_coordinates']
             else:
-                # If the fastest direct responder and thorugh AED responder are different:
-                # - Take the fastest responders for both
                 coord_direct = (lon_direct, lat_direct)
-                coord_AED = (lon_AED, lat_AED)
-                AED_coordinates = df_duration.iloc[df_duration.idxmin()['duration_through_AED']]['AED_coordinates']
+                lat_AED_2nd = subset.iloc[subset.idxmin()['duration_through_AED']]['latitude']
+                lon_AED_2nd = subset.iloc[subset.idxmin()['duration_through_AED']]['longitude']
+                coord_AED = (lon_AED_2nd, lat_AED_2nd)
+                AED_coordinates = subset.iloc[subset.idxmin()['duration_through_AED']]['AED_coordinates']
+        else:
+            # If the fastest direct responder and thorugh AED responder are different:
+            # - Take the fastest responders for both
+            coord_direct = (lon_direct, lat_direct)
+            coord_AED = (lon_AED, lat_AED)
+            AED_coordinates = df_duration.iloc[df_duration.idxmin()['duration_through_AED']]['AED_coordinates']
         
         return {'coord_direct': coord_direct, 'coord_AED': coord_AED, 'AED_coordinates': AED_coordinates}
     

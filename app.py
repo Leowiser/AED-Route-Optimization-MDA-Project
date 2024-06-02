@@ -28,7 +28,7 @@ initial_proportion = 0.005
 responder = generate_responders(initial_proportion)
 
 # Data of AED-s
-df_aed = pd.read_csv('filtered_AED_loc.csv')  # Cleaned dataset with the locations of the AEDs
+df_aed = pd.read_csv('Data/filtered_AED_loc.csv')  # Cleaned dataset with the locations of the AEDs
 AED_longitudes = df_aed['longitude'].values
 AED_latitudes = df_aed['latitude'].values
 aed = list(zip(AED_longitudes, AED_latitudes))  # Zip to one tuple
@@ -196,10 +196,10 @@ def update_chart(n_clicks, proportion, latitude_value, longitude_value):
             name='Responders'
         ))
 
-        # Add a "default" patient to the middle of Leuven 
+        # Add a the patient to the plot (to where it was before if it was set, or to the middle of Leuven)
         fig.add_trace(go.Scattermapbox(
-            lat=[lat],
-            lon=[lon],
+            lat=[latitude_value],
+            lon=[longitude_value],
             mode='markers',
             marker=go.scattermapbox.Marker(
                 size=10,
