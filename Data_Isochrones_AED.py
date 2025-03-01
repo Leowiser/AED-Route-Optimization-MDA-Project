@@ -61,9 +61,16 @@ def isochrones_AEDs(AED_df):
 
 df_iso_AED = isochrones_AEDs(df_aeds)
 
-df_iso_AED.to_file("C:/Users/leonw/OneDrive - KU Leuven/Documents/GitHub/AED-Route-Optimization-MDA-Project/Data/AED_polygons.shp", driver="ESRI Shapefile")
+# Split the tuple into latitude and longitude columns
+df_iso_AED[['lon', 'lat']] = pd.DataFrame(df_iso_AED['AED'].tolist(), index=df_iso_AED.index)
 
+# Drop the original tuple column if not needed
+df_iso_AED.drop(columns=['AED'], inplace=True)
+df_iso_AED.to_file('C:/Users/leonw/OneDrive - KU Leuven/Documents/GitHub/AED-Route-Optimization-MDA-Project/Data/temp.gpkg', layer='AED_data', driver='GPKG')
 
+#######################################
+### Visualization of the Isochrones ###
+#######################################
 
 import folium
 import geopandas as gpd
