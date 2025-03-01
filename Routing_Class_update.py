@@ -191,8 +191,8 @@ class route:
         Responder_df['Patient_loc'] = list(zip(Responder_df['Patient_lon'],Responder_df['Patient_lat']))
         # get the distance between responders and patients
         Responder_df['dist_patient'] = Responder_df.apply(lambda row: geopy.distance.distance(row['Responder_loc'], row['Patient_loc']).meters, axis=1)
-        # only keep the 5 closest responders. keep='all' so that more that all responders with the 5 lowest values are kept.
-        Responder_df = Responder_df.nsmallest(5, 'dist_patient')#, keep='all'
+        # only keep the 5 closest responders. keep='all' so that more that all responders with the 15 lowest values are kept.
+        Responder_df = Responder_df.nsmallest(15, 'dist_patient')#, keep='all'
         Responder_df = Responder_df.reset_index(drop=True)
         Responder_df['duration_direct']=[self.directions([i, Patient_cood], profile = 'foot-walking')['duration'] for i, 
                                           Patient_cood in zip(Responder_df['Responder_loc'], Responder_df['Patient_loc'])]
