@@ -10,6 +10,7 @@ import time
 import geopy.distance
 import plotly.express as px
 import plotly.graph_objects as go
+from numpy import random
 
 
 class route:
@@ -331,7 +332,13 @@ class route:
          
     # Function to find the responder that is send directly and through the AED.
     # The results are plotted using plotly
-    def send_responders(self, Patient, Responders, AEDs, N_responders, decline_rate, AED_rate):
+    # Patient = location of patient
+    # Responder = Dataframe of responders and their location
+    # AED = list of AEDs
+    # N_responders = total amount of responders that will be contacted
+    # AED_rate = proportion of N_responders that is requethrough AED
+    # decline_rate = proportion of people excpected to decline the call to action
+    def send_multiple_responders(self, Patient, Responders, AEDs, N_responders, decline_rate, AED_rate):
         df_duration_direct = self.possible_routing_direct(Patient, Responders)
         df_duration_indirect = self.possible_routing_indirect(Patient, Responders, AEDs)
 
@@ -341,51 +348,85 @@ class route:
         df_duration_indirect.sort_values(by=['duration_through_AED'], ascending=True).drop_duplicates('Responder_loc').sort_index()
         df_duration_indirect = df_duration_indirect.nsmallest(round((N_responders)*(AED_rate)), 'duration_through_AED')
 
-
-
-        fastest_aed = df_duration_indirect.loc[0]
-        fastest_gpr = df_duration_direct.loc[0]
-        second_fastest_aed = df_duration_indirect.loc[1]
-        second_fastest_gpr = df_duration_direct.loc[1]
-
-        # Fastest responder going for the AED
-        # Check if the 2nd fastest direct responder is faster than the fastes direct through AED
-        if second_fastest_gpr['duration_direct'] < fastest_aed['duration_through_AED']:
-            # if so, z equal to CPR by 2nd fastest responder
-            CPR_time = fastest_aed['duration_through_AED'] - second_fastest_gpr['duration_direct']
-            surv_A = self.survival_probability(second_fastest_gpr['duration_direct'], CPR_time)
-        else:
-            # - z equals zero as no one does any CPR
-            surv_A = self.survival_probability(fastest_aed['duration_through_AED'], 0)
-        # 2nd fastest responder arriving with AED
-        # - time until AED arrives minus time CPR arrives is the time without CPR
-        surv_B = self.survival_probability(fastest_gpr['duration_direct'], second_fastest_aed['duration_through_AED']-fastest_gpr['duration_direct'])    
-            
-        # Check if the fastest through AED is the same as the fastest direct 
-        if fastest_aed['Responder_loc']==fastest_gpr['Responder_loc']:
-            # Find best strategy which is the maximal survival chances
-            best_strategy = max(surv_A, surv_B)
-            # Send responders
-            if best_strategy == surv_A:
-                # - Second fastest direct time will be send directly  
-                # - Fastest direct and AED responder will be send through the AED
-                coord_direct = second_fastest_gpr['Responder_loc']
-                coord_AED =  fastest_aed['Responder_loc']
-                AED_coordinates = fastest_aed['AED_coordinates']
-            # If this is not true:
-            # - Fastes direct responder will be send directly
-            # - Second fastest through AED responder will be send through the AED
-            else:
-                coord_direct = fastest_gpr['Responder_loc']
-                coord_AED = second_fastest_aed['Responder_loc']
-                AED_coordinates = second_fastest_aed['AED_coordinates']
-        else:
-            # If the fastest direct responder and thorugh AED responder are different:
-            # - Take the fastest responders for both
-            coord_direct = fastest_gpr['Responder_loc']
-            coord_AED = fastest_aed['Responder_loc']
-            AED_coordinates = fastest_aed['AED_coordinates']
+        # create list of all possible responders
+        possible_responder = list(df_duration_direct['Responder_loc']) + list(df_duration_indirect['Responder_loc'])
+        # Only take individual Responders
+        seen = set()
+        possible_responder = [val for val in possible_responder if val not in seen and (seen.add(val) or True)]
+        # Randomly generate numbers with a decline_rate. 
+        # Data frame with all the possible responders and their probability to accept the call. 1 for acceptance
+        acceptance = list(random.choice([0,1], p=[decline_rate, (1-decline_rate)], size = len(possible_responder)))
+        df_acceptance = pd.DataFrame({'Responder_loc' : possible_responder,
+                                'Probability' : acceptance})
         
+        # merge the acceptance and the data
+        # Filter out the ones that did not exept
+        df_duration_direct = df_duration_direct.merge(df_acceptance, on='Responder_loc')
+        df_duration_direct = df_duration_direct[df_duration_direct['Probability'] > 0]
+        df_duration_indirect = df_duration_indirect.merge(df_acceptance, on='Responder_loc')
+        df_duration_indirect = df_duration_indirect[df_duration_indirect['Probability'] > 0]
+
+        # Send all responders either through AED or direct
+        # Send first a direct responder and then one through AED repetititively
+        # If either one does not have any more responders the rest is send in the fitting way
+        # Empty list for direct responder coordinates
+        coord_direct = []
+        # Empty list for indirect responder coordinates
+        coord_AED = []
+        # Empty list for AED coordinates
+        AED_coordinates = []
+
+        # Set indeces to 0
+        direct_index = 0
+        indirect_index = 0
+        total_direct = len(df_duration_direct)
+        total_indirect = len(df_duration_indirect)
+        # initialize a set for all already used locations to be stored in
+        used_locations = set()
+
+
+        while direct_index < total_direct and indirect_index < total_indirect:
+            # Handle the direct selection
+            direct_row = df_duration_direct.iloc[direct_index]
+            # If the responder was already used either direct or indirectly. Use the next one.
+            if direct_row['Responder_loc'] in used_locations:
+                # PROBLEM TO FIX THIS ONE COULD ALSO BE USED ALREADY!!!!!!!!
+                if direct_index+1 < len(df_duration_direct):
+                    direct_row = df_duration_direct.iloc[direct_index + 1]
+                    direct_index += 2
+                else:
+                    pass
+            else:
+                direct_index += 1
+
+            coord_direct.append(direct_row['Responder_loc'])
+            used_locations.add(direct_row['Responder_loc'])
+
+            # Handle the indirect selection
+            indirect_row = df_duration_indirect.iloc[indirect_index]
+            if indirect_row['Responder_loc'] in used_locations:
+                if indirect_index+1 < len(df_duration_direct):
+                    indirect_row = df_duration_indirect.iloc[indirect_index + 1]
+                    indirect_index += 2
+                else:
+                    pass
+            else:
+                indirect_index += 1
+
+            coord_AED.append(indirect_row['Responder_loc'])
+            AED_coordinates.append(indirect_row['AED_coordinates'])
+            used_locations.add(indirect_row['Responder_loc'])
+
+        # Add remaining rows if one of the DataFrames is already exhausted
+        if direct_index < total_direct:
+            remaining_direct = df_duration_direct.iloc[direct_index:]
+            coord_direct.extend(remaining_direct['Responder_loc'].tolist())
+
+        elif indirect_index < total_indirect:
+            remaining_indirect = df_duration_indirect.iloc[indirect_index:]
+            coord_AED.extend(remaining_indirect['Responder_loc'].tolist())
+            AED_coordinates.extend(remaining_indirect['AED_coordinates'].tolist())
+                
         return {'coord_direct': coord_direct, 'coord_AED': coord_AED, 'AED_coordinates': AED_coordinates}
     
         '''
