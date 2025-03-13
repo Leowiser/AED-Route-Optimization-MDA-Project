@@ -455,7 +455,7 @@ class route:
             if indirect_index < len(df_duration_indirect):
                 indirect_row = df_duration_indirect.iloc[indirect_index]
                 indirect_index += 1  # Move to the next one for the next iteration
-                coord_indirect.append(indirect_row['Responder_loc'])
+                coord_AED.append(indirect_row['Responder_loc'])
                 used_locations.add(indirect_row['Responder_loc'])
 
 

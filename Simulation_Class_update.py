@@ -6,6 +6,19 @@ import geopandas as gpd
 from shapely import geometry
 import time
 import geopy.distance
+import random
+
+
+# Exception class
+
+class DistributionError(Exception):
+    def __init__(self, distribution, message="Distribution must sum to 1"):
+        self.distribution = distribution
+        self.message = message
+        super().__init__(self.message)
+
+    def __str__(self):
+        return f'{self.distribution} -> {self.message}'
 
 
 
@@ -22,6 +35,9 @@ class simulation:
         # AEDS must be a dataframe with columns (This is gathered in another file) named latitude and longitude
         # profile by default is walking by foot.
         # Up to 5 AEDs can be used as locations.
+        
+        if type(Patient) != tuple:
+            raise ValueError('Input is not tuple')
 
         # set the parameters for conducting an isochrone search
         isochrones_parameters = {
@@ -57,9 +73,12 @@ class simulation:
         return df
     
     def closest_location_AED(self, Location, polygon, threshold = 600):
-        # patient must be a tuple
-        # AEDS must be a dataframe with columns (This is gathered in another file) named latitude and longitude
-        # profile by default is walking by foot
+        """
+        patient must be a tuple
+        AEDS must be a dataframe with columns (This is gathered in another file) named latitude and longitude
+        profile by default is walking by foot
+        """
+
 
         d = {'geometry': [polygon]}
         gdf = gpd.GeoDataFrame(d) 
@@ -89,9 +108,18 @@ class simulation:
         # Returns a list of tuples of the coordinates of the responders.
         return coordinate_tuples
     
-    # Function that gets the duration, route and coordinates of a route
-    # The route can be direct or go through other points first
-    def directions(self, coordinates, profile = 'foot-walking', sleep = 1.52):
+
+    def directions(self, coordinates, profile = 'foot-walking', sleep = 0):
+        """
+        Function that gets the duration, route and coordinates of a route. The route can be direct or go through other points first
+        Parameters:
+        coordinates (list): List containing [[lon,lat],[lon,lat],...] in the order of routing.
+        prifile (string): can be either foot-waling, car-driving, cycling-* [-regular, -electric, -road, -mountain], driving-hgv, or wheelchair .
+        sleep (float): seconds to wait.
+        
+        Returns:
+        ditionary: Returns dictionary with duration, route and coordinates of the route.
+        """
         client = self.Client_ors
         time.sleep(sleep)
         route = client.directions(coordinates=coordinates,
@@ -112,14 +140,45 @@ class simulation:
             route_dict['coordinates'] = route.get('features')[0]['geometry']['coordinates']
         return route_dict
     
+    def assign_opening_hours(self, df, distribution = {(6, 22): 0.5,(0, 24): 0.05,(8, 20): 0.3,(9, 18):0.15}):
+        
+        """
+        Assigns opening hours to AEDs based on a specified distribution.
+        
+        Parameters:
+        df (pd.DataFrame): DataFrame containing AEDs, assumed to have at least an 'id' column.
+        distribution (dict): Dictionary where keys are tuples of (opening_hour, closing_hour) and values are proportions. Distribution proportions must sum to 1.
+        
+        Returns:
+        pd.DataFrame: Updated DataFrame with 'opening_hour' and 'closing_hour' columns.
+        """
+        
+        # Ensure proportions sum to 1 otherwise raise Exception DistributionError
+        if sum(distribution.values()) != 1:
+            raise DistributionError(distribution)
+
+        
+        # Sample opening hours based on the distribution
+        choices = list(distribution.keys())
+        probabilities = list(distribution.values())
+        assigned_hours = np.random.choice(len(choices), size=len(df), p=probabilities)
+        
+        # Assign opening and closing hours
+        df["opening_hour"] = [choices[i][0] for i in assigned_hours]
+        df["closing_hour"] = [choices[i][1] for i in assigned_hours]
+        
+        return df
+
     # Function to get all possible routes through the AEDs that are close to the patient
     # Returns a data frame with the coordinates of the Responder, duration through the specific AED,
     # duration for the direct route, and the coordinates of the used AED
-    def fastest_time(self, Patient, Responders, AEDs, Vectors, Dist_responder = 600, Dist_AED = 600, Dist_Vector = 600, threshold = 700):
+    def fastest_time(self, Patient, Responders, AEDs, Vectors, Dist_responder = 600, Dist_AED = 600, Dist_Vector = 600, threshold = 700, distribution = {(6, 22): 0.5,(0, 24): 0.05,(8, 20): 0.3,(9, 18):0.15}):
         # Time that the isochrones covers in seconds
         Responders_loc = self.closest_location(Patient, Responders,threshold=Dist_responder)
+        # Take into account the availability of the AEDs
+        AED_loc = self.assign_opening_hours(AEDs, distribution)
         # Time that the isochrones covers in seconds
-        AED_loc = self.closest_location(Patient, AEDs, threshold=Dist_AED)
+        AED_loc = self.closest_location(Patient, AED_loc, threshold=Dist_AED)
         # Time that the isochrones covers in seconds
         Vector_loc = self.closest_location(Patient, Vectors, profile = 'driving-car', threshold = Dist_Vector)
 
@@ -254,7 +313,7 @@ class simulation:
     def survival_probability(self, x, z):
         return 0.9 **(x/60)* 0.97**(z/60)
     
-        # Function to get all possible routes through the AEDs that are close to the patient
+    # Function to get all possible routes through the AEDs that are close to the patient
     # Returns a data frame with the coordinates of the Responder, duration through the specific AED,
     # duration for the direct route, and the coordinates of the used AED
     def possible_routing_direct(self, Patient, Responders, threshold = 600):
