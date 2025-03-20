@@ -40,7 +40,7 @@ class DistributionError(Exception):
 
 class simulation:
     def __init__(self):
-        self.Client_ors = openrouteservice.Client(key='5b3ce3597851110001cf624802e069d6633748a5ae4e9842334f1dc2')
+        self.Client_ors = openrouteservice.Client(base_url='http://ec2-3-76-12-187.eu-central-1.compute.amazonaws.com:8080/ors')
         self.AED_Iso = gpd.read_file('C:/Users/leonw/OneDrive - KU Leuven/Documents/GitHub/AED-Route-Optimization-MDA-Project/Data/temp.gpkg', layer='AED_data')
 
 
