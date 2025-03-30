@@ -10,9 +10,10 @@ import time
 
 
 
-df_aeds = pd.read_csv("OneDrive - KU Leuven/Documents/GitHub/AED-Route-Optimization-MDA-Project/filtered_AED_loc.csv")
+df_aeds = pd.read_csv("C:/Users/leonw/Downloads/aed(Sheet1)(4).csv", encoding='unicode_escape')
 
-Client_ors = openrouteservice.Client(key='5b3ce3597851110001cf624802e069d6633748a5ae4e9842334f1dc2')
+ip =  "35.159.107.60"
+Client_ors = openrouteservice.Client(base_url=f'http://{ip}:8080/ors')
 
 
 def find_isochrone(Midpoint, profile = "foot-walking", threshold = 600):
@@ -51,22 +52,30 @@ def isochrones_AEDs(AED_df):
         poly = geometry.Polygon(isochrone['features'][0]['geometry']['coordinates'][0])
         list_position.append(coord)
         list_iso.append(poly)
-        time.sleep(1.7)
+        time.sleep(0)
 
     df_AED_iso = pd.DataFrame(list(zip(list_position, list_iso)), columns=['AED', 'Iso'])
         
     AED_iso = gpd.GeoDataFrame(df_AED_iso, geometry='Iso', crs="EPSG:4326")  # Fixed CRS
     return AED_iso
 
+df_iso_AED = df_aeds[["latitude","longitude"]].copy()
+df_iso_AED = df_iso_AED.dropna(subset = ['latitude', 'longitude'])
+df_iso_AED = isochrones_AEDs(df_iso_AED)
+df_AED = df_aeds[["latitude","longitude","available","Checked","Opens", "Closes"]].copy()
+df_AED = df_AED.dropna(subset = ['latitude', 'longitude'])
 
-df_iso_AED = isochrones_AEDs(df_aeds)
+coord_list = []
+for i in range(len(df_AED)):
+        coord = (df_AED['longitude'].iloc[i], df_AED['latitude'].iloc[i])
+        coord_list.append(coord)
 
-# Split the tuple into latitude and longitude columns
-df_iso_AED[['lon', 'lat']] = pd.DataFrame(df_iso_AED['AED'].tolist(), index=df_iso_AED.index)
+df_AED['AED'] = coord_list
+AED_df = df_iso_AED.merge(df_AED, on='AED')
 
 # Drop the original tuple column if not needed
-df_iso_AED.drop(columns=['AED'], inplace=True)
-df_iso_AED.to_file('C:/Users/leonw/OneDrive - KU Leuven/Documents/GitHub/AED-Route-Optimization-MDA-Project/Data/temp.gpkg', layer='AED_data', driver='GPKG')
+AED_df.drop(columns=['AED'], inplace=True)
+AED_df.to_file('C:/Users/leonw/OneDrive - KU Leuven/Documents/GitHub/AED-Route-Optimization-MDA-Project/Data/temp.gpkg', layer='AED_data', driver='GPKG')
 
 #######################################
 ### Visualization of the Isochrones ###

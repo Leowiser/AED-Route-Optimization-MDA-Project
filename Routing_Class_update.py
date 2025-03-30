@@ -338,15 +338,15 @@ class route:
     # N_responders = total amount of responders that will be contacted
     # AED_rate = proportion of N_responders that is requethrough AED
     # decline_rate = proportion of people excpected to decline the call to action
-    def send_multiple_responders(self, Patient, Responders, AEDs, N_responders, decline_rate, AED_rate):
+    def send_multiple_responders(self, Patient, Responders, AEDs, N_responders, decline_rate):
         df_duration_direct = self.possible_routing_direct(Patient, Responders)
         df_duration_indirect = self.possible_routing_indirect(Patient, Responders, AEDs)
 
         df_duration_direct = df_duration_direct.sort_values(by=['duration_direct'], ascending=True)
-        df_duration_direct = df_duration_direct.nsmallest(round((N_responders)*(1-AED_rate)), 'duration_direct')
+        df_duration_direct = df_duration_direct.nsmallest(round((N_responders)), 'duration_direct')
         # Only keep the fastest route through AED for every responder
         df_duration_indirect.sort_values(by=['duration_through_AED'], ascending=True).drop_duplicates('Responder_loc').sort_index()
-        df_duration_indirect = df_duration_indirect.nsmallest(round((N_responders)*(AED_rate)), 'duration_through_AED')
+        df_duration_indirect = df_duration_indirect.nsmallest(round((N_responders)), 'duration_through_AED')
 
         # create list of all possible responders
         possible_responder = list(df_duration_direct['Responder_loc']) + list(df_duration_indirect['Responder_loc'])
