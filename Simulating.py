@@ -10,6 +10,42 @@ import random
 from Simulation_Class_update_2nd import RoutingSimulation
 
 
+# Exception class
+#------------------------------------------------------------------------------------------------------------------------
+#--------------------------------------------------------------------------------------------------------------------------
+
+class NotAcceptableDeclineRate(Exception):
+    """Raised when no responder accepts the request."""
+    def __init__(self, distribution, message="Distribution must sum to 1"):
+        self.distribution = distribution
+        self.message = message
+        super().__init__(self.message)
+
+    def __str__(self):
+        return f'{self.distribution} -> {self.message}'
+
+
+class NoAEDResponderAcceptedError(Exception):
+    """Raised when no responder through AED accepts the request."""
+    pass
+
+class NotAcceptableInput(Exception):
+    '''
+    Raised when distribution in opening hours does not add to 1
+    '''
+
+    def _number_input(self, input_type, input_value, lower_limit, upper_limit):
+        return f'Given {input_type} is: {input_value} -> But value should be between {lower_limit} and {upper_limit}'
+
+    def _str_input(self, input_value, possible_list):
+        return f'Given input is: {input_value} -> But value should be one of the following or a combination of these {possible_list}'
+
+
+#--------------------------------------------------------------------------------------------------------------------------
+#--------------------------------------------------------------------------------------------------------------------------
+
+
+
 class Simulation:
     def __init__(self, ip):
         self.IP = ip
@@ -69,19 +105,45 @@ class Simulation:
         return sampled_points_gdf
 
     
-    def simulation_run(self, responders, decline_rate, max_number_responder, opening_hour, filter_values, time_of_day = "day", proportion = 0.01, dist_responder = 600, dist_AED = 600, dist_Vector = 600):
+    def simulation_run(self, decline_rate, max_number_responder, opening_hour, filter_values, time_of_day, proportion, dist_responder = 600, dist_AED = 600, dist_Vector = 600):
+        # If no responders are available, raise an exception
+        exception_input = NotAcceptableInput()
+        # Fix: Corrected condition for valid range
+        if not (0 <= decline_rate <= 1):
+            raise NotAcceptableInput(exception_input._number_input("decline_rate", decline_rate, 0, 1))
+        
+        if not (0 <= proportion <= 1):
+            raise NotAcceptableInput(exception_input._number_input("proportion", proportion, 0, 1))
+
+        if not (0 <= opening_hour <= 24):
+            raise NotAcceptableInput(exception_input._number_input("opening hour",opening_hour, 0, 24))
+
+        possible_list = ["Yes", "Private", "Company"]
+        if filter_values is not None and not set(filter_values).issubset(possible_list):
+            raise NotAcceptableInput(exception_input._str_input(filter_values, possible_list))
+        
         df_final = pd.DataFrame(columns = ['Patient_loc', 'Responder_loc', 'duration_Responder', 
                                            'Indirect_Responder_loc', 'AED_loc', 'duration_AED',
-                                           'Vector_loc', 'duration_Vector'])
+                                           'Vector_loc', 'duration_Vector', 'prob_vec', 'prob_resp'])
         
-        responders = __generate_cfrs(time_of_day, proportion)
+        responders = self.__generate_cfrs(time_of_day, proportion)
         ip = self.IP
         routing = RoutingSimulation(ip)
+
         for _, patient in self.PATIENTS.iterrows():
             df = routing.fastest_time(patient, responders, self.AEDs, self.VECTORS, decline_rate, max_number_responder, opening_hour, filter_values, dist_responder, dist_AED, dist_Vector)
+            # Extract relevant durations
+            df['duration_AED'] = df['duration_AED'].replace('No AED', float(10000))
+            df['duration_Responder'] = df['duration_Responder'].replace('No responder', float(10000))
+            duration_responder = df['duration_Responder'].iloc[0] if 'duration_Responder' in df.columns else None
+            duration_AED = df['duration_AED'].iloc[0] if 'duration_AED' in df.columns else None
+            duration_vector = df['duration_Vector'].iloc[0] if 'duration_Vector' in df.columns else None
+
+            prob_resp, prob_vec = self.__probability_survival(duration_responder, duration_AED, duration_vector)
+            df['prob_vec'] = prob_vec
+            df['prob_resp'] = prob_resp
             df_final = pd.concat([df_final,df])
             df_final = df_final.reset_index(drop = True)
-
         
         return df_final
     
@@ -90,7 +152,7 @@ class Simulation:
         # info on survival rates from: https://www.sciencedirect.com/science/article/pii/S0019483219304080
         # and from here: https://jamanetwork.com/journals/jama/fullarticle/196200
         # and from here: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2600120/
-    def probability_survival(self, duration_responder, duration_AED, duration_vector, decrease_with_cpr = 0.97, decrease_no_cpr = 0.9):
+    def __probability_survival(self, duration_responder, duration_AED, duration_vector, decrease_with_cpr = 0.97, decrease_no_cpr = 0.9):
         # explanation of parameters 
         # duration_responder: time it takes for responder without aed to arrive, integer
         # duration_AED: for aed to arrive, integer
@@ -122,7 +184,7 @@ class Simulation:
 
     
         
-    def survival(self, responders, decline_rate, max_number_responder, incident_time):
+    def __survival(self, responders, decline_rate, max_number_responder, incident_time):
         df = self.simulation_run(responders, decline_rate, max_number_responder, incident_time)
         # find instances where duration_Responder is 'No responder' or duration_AED is "No AED" and replace them with 10000
         df['duration_Responder'] = df['duration_Responder'].replace('No responder', float(10000))
