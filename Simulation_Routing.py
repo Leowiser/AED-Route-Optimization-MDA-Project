@@ -216,10 +216,10 @@ class RoutingSimulation:
         decline_rate (float): !!!Must be between 0 and 1!!! Represents the percentage of responders declining the call to action.
         max_number_responders(int): Number of responders contacted
         opening_hours(float): time of the incident
+        filter_values (list): List with all strings that the AED dataframe column "available" will be subseted by. If None every AED will be considered !!!CASE SENSITIVE!!!
         dist_responder = 600 (float): Time in seconds it takes to travel by foot to the furthest away point still included in the area (Used to find responders in that area).
         dist_AED = 600 (float): Time in seconds it takes to travel by foot to the furthest away point still included in the area (Used to find aeds in that area).
         dist_Vector = 600 (float): Time in seconds it takes to travel by car to the furthest away point still included in the area (Used to find vectors in that area).
-        distribution (dictionary): Dictionary where keys are tuples of (opening_hours, closing_hour) and values are proportions. !!!Distribution proportions must sum to 1!!!
         
         Returns:
         pd.DataFrame: Dataframe with 
@@ -588,9 +588,9 @@ class RoutingSimulation:
     # decline_rate = proportion of people excpected to decline the call to action
     def __send_responders(self, patient, responders, aed_loc, max_number_responders, decline_rate, opening_hours, filter_values):
         """
-        Function to find all possible indirect routes through AEDs.
-        Used in function: def __send_responders
-        Uses function: def __closest_location_aed, def __directions
+        Function to find the optimal responders to send directly or indirectly.
+        Used in function: def __fastest_comparisson
+        Uses function: def __possible_routing_direct, def __possible_routing_indirect, def __survival_probability
         
         Parameters:
         patient (pd.Series): patients coordinates in a series with name "longitude", "latitude". !!!CASE SENSITIVE!!!
@@ -610,7 +610,7 @@ class RoutingSimulation:
                 'duration_through_AED':Duration it takes the responder to get to aed and then the patient}
         """
         df_duration_direct = self.__possible_routing_direct(patient, responders)
-        df_duration_indirect = self.__possible_routing_indirect(patient, responders, aed_loc,  opening_hours, available, all, Private, Company)
+        df_duration_indirect = self.__possible_routing_indirect(patient, responders, aed_loc,  opening_hours, filter_values)
 
         df_duration_direct = df_duration_direct.sort_values(by=['duration_direct'], ascending=True)
         df_duration_direct = df_duration_direct.nsmallest(round((max_number_responders)), 'duration_direct')
@@ -714,7 +714,7 @@ class RoutingSimulation:
     # Function to build a data frame with the fastest direct, indirect and vector duration.
     def __fastest_comparisson(self, patient, vector_loc, responder_loc, aed_loc, max_number_responders, decline_rate, opening_hours, filter_values):
         """
-        Function calculating the time there are no aeds close by.
+        Function calculating the time of the direct, indirect responder and vector to arrive at the patient.
         Used in function: def fastest_time
         Uses function: def send_responder, def __directions
         
@@ -726,7 +726,7 @@ class RoutingSimulation:
         max_number_responders(int): Numbers of responders contacted
         decline_rate (float): !!!Must be between 0 and 1!!! Represents the percentage of responders declining the call to action.
         opening_hours (float): Time of the day. Checks of the AED is open during that time. 
-        distribution (dictionary): Dictionary where keys are tuples of (opening_hours, closing_hour) and values are proportions. !!!Distribution proportions must sum to 1!!!
+        filter_values (list): List with all strings that the AED dataframe column "available" will be subseted by. If None every AED will be considered !!!CASE SENSITIVE!!!
                 
         Returns:
         pd.DataFrame: Dataframe with 
