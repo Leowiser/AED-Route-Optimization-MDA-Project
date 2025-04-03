@@ -54,8 +54,8 @@ class Simulation:
         self.AMBULANCES = pd.read_parquet("Data/ambulance_locations.parquet.gzip")
         self.VECTORS = self.__clean_vector()
         self.STAT_SEC_GEOMETRIES = gpd.read_file("C:/Users/leonw/Downloads/first_responder_generation.gpkg")
-        intervention = pd.read_csv("Data/interventions.csv")
-        intervention.rename(columns = {'Longitude intervention':'longitude', 'Latitude intervention':'latitude'}, inplace = True)
+        intervention = pd.read_excel("C:/Users/leonw/OneDrive - KU Leuven/Documents/GitHub/AED-Route-Optimization-MDA-Project/Data/interventions_new.xlsx")
+        intervention.rename(columns = {'longitude_intervention':'longitude', 'latitude_intervention':'latitude'}, inplace = True)
         intervention['coordinates'] = list(zip(intervention['longitude'], intervention['latitude']))
         self.PATIENTS = intervention.copy()
         self.AED_ISO = gpd.read_file('C:/Users/leonw/OneDrive - KU Leuven/Documents/GitHub/AED-Route-Optimization-MDA-Project/Data/temp.gpkg', layer='AED_data')
@@ -89,7 +89,7 @@ class Simulation:
         df_vectors = df_vectors[['longitude', 'latitude','coordinates']]
         return df_vectors
 
-    def __generate_cfrs(time_of_day = "day", proportion = 0.01):
+    def _generate_cfrs(self, time_of_day = "day", proportion = 0.01):
         stat_sec_geometries = self.STAT_SEC_GEOMETRIES
         if time_of_day == "day":
             cfr_counts = "total_daytime_CFRs"
@@ -122,16 +122,19 @@ class Simulation:
         if filter_values is not None and not set(filter_values).issubset(possible_list):
             raise NotAcceptableInput(exception_input._str_input(filter_values, possible_list))
         
-        df_final = pd.DataFrame(columns = ['Patient_loc', 'Responder_loc', 'duration_Responder', 
-                                           'Indirect_Responder_loc', 'AED_loc', 'duration_AED',
-                                           'Vector_loc', 'duration_Vector', 'prob_vec', 'prob_resp'])
+        df_final = pd.DataFrame(columns = ['Patient_loc', 'Responder_loc', 'duration_Responder', 'route_Responder',
+                                           'Indirect_Responder_loc', 'AED_loc', 'duration_AED', 'route_indirect_Responder',
+                                           'Vector_loc', 'duration_Vector', 'route_Vector', 'prob_vec', 'prob_resp'])
+
         
-        responders = self.__generate_cfrs(time_of_day, proportion)
+        responders = self._generate_cfrs(time_of_day, proportion)
+        responders = responders.reset_index(drop=True)
         ip = self.IP
         routing = RoutingSimulation(ip)
 
         for _, patient in self.PATIENTS.iterrows():
-            df = routing.fastest_time(patient, responders, self.AEDs, self.VECTORS, decline_rate, max_number_responder, opening_hour, filter_values, dist_responder, dist_AED, dist_Vector)
+            df = routing.fastest_time(patient, responders, self.VECTORS, decline_rate, 
+                                      max_number_responder, opening_hour, filter_values, dist_responder, dist_AED, dist_Vector)
             # Extract relevant durations
             df['duration_AED'] = df['duration_AED'].replace('No AED', float(10000))
             df['duration_Responder'] = df['duration_Responder'].replace('No responder', float(10000))
