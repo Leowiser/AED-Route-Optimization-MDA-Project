@@ -26,7 +26,7 @@ class NoAEDResponderAcceptedError(Exception):
 
 
 
-class RoutingSimulation:
+class RoutingSimulationMatrix:
     def __init__(self, ip):
         self.IP = ip
         self.CLIENT_ORS = openrouteservice.Client(base_url=f'http://{self.IP}:8080/ors')
@@ -186,6 +186,32 @@ class RoutingSimulation:
 
         return route_dict
 
+    def __matrix_duration(self, coordinates, profile = 'foot-walking'):
+        """
+        Function that gets the duration, route and coordinates of a route. The route can be direct or go through other points first
+        Used in function: def __fastest_vector, def __direct_vs_vector, def __possible_routing_direct, def __possible_routing_indirect, def __fastest_comparisson
+        Uses function:
+        
+        Parameters:
+        coordinates (list): List containing [[lon,lat],[lon,lat],...] in the order of routing.
+        prifile (string): can be either foot-waling, car-driving, cycling-* [-regular, -electric, -road, -mountain], driving-hgv, or wheelchair .
+        sleep (float): seconds to wait.
+        
+        Returns:
+        ditionary: Returns dictionary with duration, route and coordinates of the route.
+        """
+        custom_client = self.CLIENT_ORS
+        #time.sleep(sleep)
+        matrix = custom_client.distance_matrix(
+            locations=coordinates,
+            destinations = [0],
+            profile = profile,
+            metrics=['distance', 'duration'],
+            validate=False,
+        )
+        
+        return matrix
+
     # Function to get all possible routes through the aeds that are close to the patient
     # Returns a data frame with the coordinates of the Responder, duration through the specific AED,
     # duration for the direct route, and the coordinates of the used AED
@@ -305,14 +331,22 @@ class RoutingSimulation:
                 'vector_loc':Vector location,
                 'duration_Vector':Duration it takes the vector to get to the patient}
         """
-
-        patient = pd.DataFrame(patient)
-        # transpose into a row with columns of coordinates
-        patient = patient.transpose()
-        # reset index to be able to get longitude with 0 for the longitude and latitude.
-        patient = patient.reset_index(drop = True)
+        if isinstance(patient, pd.Series):
+            patient = patient.to_frame().T
+        elif isinstance(patient, pd.DataFrame) and patient.shape[0] != 1:
+            # If patient DataFrame has multiple rows, take the first one (or adjust as needed)
+            patient = patient.iloc[[0]]
+            
+        # Reset index so that we can safely index using .loc[0, ...]
+        patient = patient.reset_index(drop=True)
+        # patient = pd.DataFrame(patient)
+        # # transpose into a row with columns of coordinates
+        # patient = patient.transpose()
+        # # reset index to be able to get longitude with 0 for the longitude and latitude.
+        # patient = patient.reset_index(drop = True)
         Vector_df = pd.DataFrame(vector_loc)
         Vector_df.rename(columns = {'coordinates':'vector_loc'}, inplace = True)
+        Vector_df[['vector_lon', 'vector_lat']] = pd.DataFrame(Vector_df['vector_loc'].tolist(), index=Vector_df.index)
         Vector_df['patient_lon'] = patient.loc[0, ('longitude')]
         Vector_df['patient_lat'] = patient.loc[0, ('latitude')]
         Vector_df['patient_loc'] = list(zip(Vector_df['patient_lon'],Vector_df['patient_lat']))
@@ -320,28 +354,30 @@ class RoutingSimulation:
         # Only keep the 15 closest vectors. keep='all' so that all responders with the 5 lowest values are kept.
         # This is done to minimize the requests to the API (max = 2000 a day)
         subset_vector = Vector_df.nsmallest(15, 'dist_patient', keep='all')
-        subset_vector[['duration', 'route', 'coordinates']] = subset_vector.apply(
-            lambda row: pd.Series(self.__directions([row['vector_loc'], row['patient_loc']], 
-                                                    profile='driving-car')),axis=1)
+        coordination_list = [[patient.loc[0, ('longitude')], patient.loc[0, ('latitude')]]]+subset_vector.apply(lambda row: [row["vector_lon"], 
+                                                                                                              row["vector_lat"]], axis=1).tolist()
         
+        print(f'There are {len(coordination_list)-1} vector options.')
+        duration_results = self.__matrix_duration(coordination_list, profile="driving-car")
+        subset_vector["duration"] = [item for row in duration_results["durations"][1:len(subset_vector)+1] for item in row]
+            
         # reset the index of the subset to make indexing possible again
         subset_vector = subset_vector.reset_index(drop = True)
         # select the fastest overall time
         min_idx_vec = subset_vector['duration'].idxmin()
         fastest_Vector = subset_vector.loc[min_idx_vec, 'duration']
         loc_Vector = subset_vector.loc[min_idx_vec, 'vector_loc']
-        route_Vector = subset_vector.loc[min_idx_vec, 'coordinates']
+        #route_Vector = subset_vector.loc[min_idx_vec, 'coordinates']
         loc_patient = subset_vector.loc[min_idx_vec, 'patient_loc']
         print('Duration for vectors found')
         
         dict = {'patient_loc':[loc_patient], 
                 'responder_loc':'No responder', 
-                'duration_Responder':'No responder', 'route_Responder':'No responder',
+                'duration_Responder':'No responder',
                 'Indirect_Responder_loc':'No AED', 'aed_loc':'No AED',
                 'duration_AED':'No AED', 'route_indirect_Responder':'No AED',
                 'vector_loc':[loc_Vector],
-                'duration_Vector':[fastest_Vector],
-                'route_Vector':[route_Vector]}
+                'duration_Vector':[fastest_Vector]}
         df_vector = pd.DataFrame(dict)
         return df_vector
 
@@ -367,14 +403,18 @@ class RoutingSimulation:
                 'vector_loc':Vector location,
                 'duration_Vector':Duration it takes the vector to get to the patient}
         """
-
-        patient = pd.DataFrame(patient)
-        # transpose into a row with columns of coordinates
-        patient = patient.transpose()
-        # reset index to be able to get longitude with 0 for the longitude and latitude.
-        patient = patient.reset_index(drop = True)
+        if isinstance(patient, pd.Series):
+            patient = patient.to_frame().T
+        elif isinstance(patient, pd.DataFrame) and patient.shape[0] != 1:
+            # If patient DataFrame has multiple rows, take the first one (or adjust as needed)
+            patient = patient.iloc[[0]]
+            
+        # Reset index so that we can safely index using .loc[0, ...]
+        patient = patient.reset_index(drop=True)
+        
         Responder_df = pd.DataFrame(responder_loc)
         Responder_df.rename(columns = {'coordinates':'responder_loc'}, inplace = True)
+        Responder_df[['responder_lon', 'responder_lat']] = pd.DataFrame(Responder_df['responder_loc'].tolist(), index=Responder_df.index)
         Responder_df['patient_lon'] = patient.loc[0, ('longitude')]
         Responder_df['patient_lat']  = patient.loc[0, ('latitude')]
         Responder_df['patient_loc'] = list(zip(Responder_df['patient_lon'],Responder_df['patient_lat']))
@@ -402,50 +442,58 @@ class RoutingSimulation:
         # only keep the 15 closest responders. keep='all' so  that all responders with the 5 lowest values are kept.
         # This is done to minimize the requests to the API (max = 2000 a day)  
         subset_responder = Responder_df.nsmallest(max_number_responders, 'dist_patient', keep='all')
-        subset_responder[['duration_direct', 'route_direct', 'coordinates_direct']] = subset_responder.apply(
-            lambda row: pd.Series(self.__directions([row['responder_loc'], row['patient_loc']], 
-                                                    profile='foot-walking')),axis=1)
+
+        coordination_list_resp = [[patient.loc[0, ('longitude')], patient.loc[0, ('latitude')]]]+subset_responder.apply(lambda row: [row["responder_lon"], 
+                                                                                                              row["responder_lat"]], axis=1).tolist()
         
+        print(f'There are {len(coordination_list_resp)-1} direct responder options.')
+        duration_results_resp = self.__matrix_duration(coordination_list_resp, profile="foot-walking")
+        subset_responder["duration_direct"] = [item for row in duration_results_resp["durations"][1:len(subset_responder)+1] for item in row]
+            
         # reset the index of the subset to make indexing possible again
         subset_responder = subset_responder.reset_index(drop = True)
+
         # select the fastest overall time
         min_idx = subset_responder['duration_direct'].idxmin()
         fastest_Responder = subset_responder.loc[min_idx, 'duration_direct']
         loc_Responder = subset_responder.loc[min_idx, 'responder_loc']
-        route_Responder = subset_responder.loc[min_idx, 'coordinates_direct']
+        # route_Responder = subset_responder.loc[min_idx, 'coordinates_direct']
         print('Duration for responders found')
         
-
         Vector_df = pd.DataFrame(vector_loc)
         Vector_df.rename(columns = {'coordinates':'vector_loc'}, inplace = True)
+        Vector_df[['vector_lon', 'vector_lat']] = pd.DataFrame(Vector_df['vector_loc'].tolist(), index=Vector_df.index)
         Vector_df['patient_lon'] = patient.loc[0, ('longitude')]
         Vector_df['patient_lat'] = patient.loc[0, ('latitude')]
         Vector_df['patient_loc'] = list(zip(Vector_df['patient_lon'],Vector_df['patient_lat']))
         Vector_df['dist_patient'] = Vector_df.apply(lambda row: geopy.distance.distance(row['vector_loc'], row['patient_loc']).meters, axis=1)
-        # only keep the 15 closest vectors. keep='all' so that more that all responders with the 5 lowest values are kept.
+        # Only keep the 15 closest vectors. keep='all' so that all responders with the 5 lowest values are kept.
         # This is done to minimize the requests to the API (max = 2000 a day)
         subset_vector = Vector_df.nsmallest(max_number_responders, 'dist_patient', keep='all')
-        subset_vector[['duration', 'route', 'coordinates']] = subset_vector.apply(
-            lambda row: pd.Series(self.__directions([row['vector_loc'], row['patient_loc']], 
-                                                    profile='driving-car')),axis=1)
+        coordination_list = [[patient.loc[0, ('longitude')], patient.loc[0, ('latitude')]]]+subset_vector.apply(lambda row: [row["vector_lon"], 
+                                                                                                              row["vector_lat"]], axis=1).tolist()
+        print(f'There are {len(coordination_list)-1} vector options.')
+        
+        duration_results = self.__matrix_duration(coordination_list, profile="driving-car")
+        subset_vector["duration"] = [item for row in duration_results["durations"][1:len(subset_vector)+1] for item in row]
+
         # reset the index of the subset to make indexing possible again
         subset_vector = subset_vector.reset_index(drop = True)
         # select the fastest overall time
         min_idx_vec = subset_vector['duration'].idxmin()
         fastest_Vector = subset_vector.loc[min_idx_vec, 'duration']
         loc_Vector = subset_vector.loc[min_idx_vec, 'vector_loc']
-        route_Vector = subset_vector.loc[min_idx_vec, 'coordinates']
+        #route_Vector = subset_vector.loc[min_idx_vec, 'coordinates']
         loc_patient = subset_vector.loc[min_idx_vec, 'patient_loc']
         print('Duration for vectors found')
         
         dict = {'patient_loc':[loc_patient], 
                 'responder_loc':[loc_Responder], 
-                'duration_Responder':[fastest_Responder], 'route_Responder':[route_Responder],
+                'duration_Responder':[fastest_Responder],
                 'Indirect_Responder_loc':'No AED', 'aed_loc':'No AED',
                 'duration_AED':'No AED', 'route_indirect_Responder':'No AED',
                 'vector_loc':[loc_Vector],
-                'duration_Vector':[fastest_Vector],
-                'route_Vector':[route_Vector]}
+                'duration_Vector':[fastest_Vector]}
         
         df = pd.DataFrame(dict)
         
@@ -459,7 +507,7 @@ class RoutingSimulation:
     # Function to get all possible routes through the aeds that are close to the patient
     # Returns a data frame with the coordinates of the Responder, duration through the specific AED,
     # duration for the direct route, and the coordinates of the used AED
-    def __possible_routing_direct(self, patient, responders):
+    def __possible_routing_direct(self, patient, responders, max_number_responders):
         """
         Function to calculate all possible direct routes.
         Used in function: df __send_responder
@@ -478,25 +526,49 @@ class RoutingSimulation:
                 'duration_direct': Duration it takes the direct responder to get to the patient
                 }
         """
-        patient = pd.DataFrame(patient)
-        # transpose into a row with columns of coordinates
-        patient = patient.transpose()
-        # reset index to be able to get longitude with 0 for the longitude and latitude.
-        patient = patient.reset_index(drop = True)
+
+        if isinstance(patient, pd.Series):
+            patient = patient.to_frame().T
+        elif isinstance(patient, pd.DataFrame) and patient.shape[0] != 1:
+            # If patient DataFrame has multiple rows, take the first one (or adjust as needed)
+            patient = patient.iloc[[0]]
+            
+        # Reset index so that we can safely index using .loc[0, ...]
+        patient = patient.reset_index(drop=True)
+        
         Responder_df = pd.DataFrame(responders)
-        Responder_df.rename(columns = {'coordinates':'responder_loc'}, inplace = True)
-        Responder_df['patient_lon'] = patient.loc[0, ('longitude')]
-        Responder_df['patient_lat']  = patient.loc[0, ('latitude')]
-        Responder_df['patient_loc'] = list(zip(Responder_df['patient_lon'],Responder_df['patient_lat']))
+        Responder_df.rename(columns={'coordinates': 'responder_loc'}, inplace=True)
+        Responder_df[['responder_lon', 'responder_lat']] = pd.DataFrame(
+            Responder_df['responder_loc'].tolist(), index=Responder_df.index
+        )
+        
+        # Use simple indexing assuming patient is now a DataFrame with one row.
+        Responder_df['patient_lon'] = patient.loc[0, 'longitude']
+        Responder_df['patient_lat'] = patient.loc[0, 'latitude']
+        Responder_df['patient_loc'] = list(zip(Responder_df['patient_lon'], Responder_df['patient_lat']))
+        
         # Uncomment to filter out the ones that have a far away distance as the crow flies
-        # Responder_df['dist_patient'] = Responder_df.apply(lambda row: geopy.distance.distance(row['responder_loc'], row['patient_loc']).meters, axis=1)
-        # only keep the 15 closest responders. keep='all' so that more that all responders with the 15 lowest values are kept.
-        # Responder_df = Responder_df.nsmallest(15, 'dist_patient')#, keep='all'
-        # Responder_df = Responder_df.reset_index(drop=True)
-        Responder_df[['duration_direct', 'route_direct', 'coordinates_direct']] = Responder_df.apply(
-            lambda row: pd.Series(self.__directions([row['responder_loc'], row['patient_loc']], 
-                                                    profile='foot-walking')).reindex(
-                ['duration_direct', 'route_direct', 'coordinates_direct'], fill_value=None), axis=1)
+        Responder_df['dist_patient'] = Responder_df.apply(
+            lambda row: geopy.distance.distance(row['responder_loc'], row['patient_loc']).meters, axis=1
+        )
+        
+        # Keep only the closest responders, up to max_number_responders.
+        Responder_df = Responder_df.nsmallest(max_number_responders, 'dist_patient', keep='all')
+        Responder_df = Responder_df.reset_index(drop=True)
+        
+        coordination_list_resp = (
+            [[patient.loc[0, 'longitude'], patient.loc[0, 'latitude']]]
+            + Responder_df.apply(lambda row: [row["responder_lon"], row["responder_lat"]], axis=1).tolist()
+        )
+        print(f'There are {len(coordination_list_resp)-1} direct responder options.')
+        
+        duration_results_resp = self.__matrix_duration(coordination_list_resp, profile="foot-walking")
+        Responder_df["duration_direct"] = [item for row in duration_results_resp["durations"][1:len(Responder_df)+1] for item in row]
+            
+        #Responder_df[['duration_direct', 'route_direct', 'coordinates_direct']] = Responder_df.apply(
+        #    lambda row: pd.Series(self.__directions([row['responder_loc'], row['patient_loc']], 
+        #                                            profile='foot-walking')).reindex(
+        #        ['duration_direct', 'route_direct', 'coordinates_direct'], fill_value=None), axis=1)
         
         #Responder_df[['duration_direct', 'route_direct', 'coordinates_direct']] = Responder_df.apply(
         #    lambda row: pd.Series(self.__directions([row['responder_loc'], row['patient_loc']], 
@@ -527,9 +599,15 @@ class RoutingSimulation:
                 'duration_through_AED': Duration it takes the responder to get to aed and then the patient
                 }
         """
-        patient = pd.DataFrame(patient)
-        patient = patient.transpose()
-        patient = patient.reset_index(drop = True)
+        if isinstance(patient, pd.Series):
+            patient = patient.to_frame().T
+        elif isinstance(patient, pd.DataFrame) and patient.shape[0] != 1:
+            # If patient DataFrame has multiple rows, take the first one (or adjust as needed)
+            patient = patient.iloc[[0]]
+            
+        # Reset index so that we can safely index using .loc[0, ...]
+        patient = patient.reset_index(drop=True)
+
         Responder_df = pd.DataFrame(responder_loc)
         Responder_df.rename(columns = {'coordinates':'responder_loc'}, inplace = True)
         Responder_df['patient_lon'] = patient.loc[0, ('longitude')]
@@ -636,7 +714,7 @@ class RoutingSimulation:
                 'AED_coordinates': Coordinates of the AED, 
                 'duration_through_AED':Duration it takes the responder to get to aed and then the patient}
         """
-        df_duration_direct = self.__possible_routing_direct(patient, responders)
+        df_duration_direct = self.__possible_routing_direct(patient, responders, max_number_responders)
         df_duration_indirect = self.__possible_routing_indirect(patient, responders, aed_loc,  opening_hours, filter_values)
 
         df_duration_direct = df_duration_direct.sort_values(by=['duration_direct'], ascending=True)
@@ -712,7 +790,7 @@ class RoutingSimulation:
                 # - Fastest direct and AED responder will be send through the AED
                 coord_direct = second_fastest_cpr['responder_loc']
                 duration_direct = second_fastest_cpr['duration_direct']
-                route_direct = second_fastest_cpr['route_direct']
+                #route_direct = second_fastest_cpr['route_direct']
                 coord_AED =  fastest_aed['responder_loc']
                 AED_coordinates = fastest_aed['AED_coordinates']
                 duration_indirect = fastest_aed['duration_through_AED']
@@ -723,7 +801,7 @@ class RoutingSimulation:
             else:
                 coord_direct = fastest_cpr['responder_loc']
                 duration_direct = fastest_cpr['duration_direct']
-                route_direct = fastest_cpr['route_direct']
+                #route_direct = fastest_cpr['route_direct']
                 coord_AED = second_fastest_aed['responder_loc']
                 AED_coordinates = second_fastest_aed['AED_coordinates']
                 duration_indirect = second_fastest_aed['duration_through_AED']
@@ -733,14 +811,14 @@ class RoutingSimulation:
             # - Take the fastest responders for both
             coord_direct = fastest_cpr['responder_loc']
             duration_direct = fastest_cpr['duration_direct']
-            route_direct = fastest_cpr['route_direct']
+            #route_direct = fastest_cpr['route_direct']
             coord_AED = fastest_aed['responder_loc']
             AED_coordinates = fastest_aed['AED_coordinates']
             duration_indirect = fastest_aed['duration_through_AED']
             route_indirect = fastest_aed['route_indirect']
             
             
-        return {'coord_direct': coord_direct, 'duration_direct':duration_direct, 'route_direct':route_direct,
+        return {'coord_direct': coord_direct, 'duration_direct':duration_direct,
         'coord_AED': coord_AED, 'AED_coordinates': AED_coordinates, 'duration_through_AED':duration_indirect, 
         'route_indirect':route_indirect}
 
@@ -774,42 +852,54 @@ class RoutingSimulation:
         responders_send = self.__send_responders(patient,  responder_loc, aed_loc, max_number_responders, decline_rate, opening_hours, filter_values)
         loc_Responder = responders_send['coord_direct']
         fastest_Responder = responders_send['duration_direct']
-        route_Responder = responders_send['route_direct']
+        #route_Responder = responders_send['route_direct']
         loc_AED = responders_send['AED_coordinates']
         loc_indirect_Responder = responders_send['coord_AED']
         fastest_AED = responders_send['duration_through_AED']
         route_AED = responders_send['route_indirect']
         
+        if isinstance(patient, pd.Series):
+            patient = patient.to_frame().T
+        elif isinstance(patient, pd.DataFrame) and patient.shape[0] != 1:
+            # If patient DataFrame has multiple rows, take the first one (or adjust as needed)
+            patient = patient.iloc[[0]]
+            
+        # Reset index so that we can safely index using .loc[0, ...]
+        patient = patient.reset_index(drop=True)
+        
         Vector_df = pd.DataFrame(vector_loc)
         Vector_df.rename(columns = {'coordinates':'vector_loc'}, inplace = True)
-        Vector_df['patient_lon'] = patient['longitude']
-        Vector_df['patient_lat'] = patient['latitude']
+        Vector_df[['vector_lon', 'vector_lat']] = pd.DataFrame(Vector_df['vector_loc'].tolist(), index=Vector_df.index)
+        Vector_df['patient_lon'] = patient.loc[0, ('longitude')]
+        Vector_df['patient_lat'] = patient.loc[0, ('latitude')]
         Vector_df['patient_loc'] = list(zip(Vector_df['patient_lon'],Vector_df['patient_lat']))
         Vector_df['dist_patient'] = Vector_df.apply(lambda row: geopy.distance.distance(row['vector_loc'], row['patient_loc']).meters, axis=1)
-        # only keep the 5 closest vectors. keep='all' so that more that all responders with the 5 lowest values are kept.
-        # This is done to minimize the requests to the API (max = 2000 a day) 
+        # Only keep the 15 closest vectors. keep='all' so that all responders with the 5 lowest values are kept.
+        # This is done to minimize the requests to the API (max = 2000 a day)
         subset_vector = Vector_df.nsmallest(15, 'dist_patient', keep='all')
-        subset_vector[['duration', 'route', 'coordinates']] = subset_vector.apply(
-            lambda row: pd.Series(self.__directions([row['vector_loc'], row['patient_loc']], 
-                                                    profile='driving-car')),axis=1)
+        coordination_list = [[patient.loc[0, ('longitude')], patient.loc[0, ('latitude')]]]+subset_vector.apply(lambda row: [row["vector_lon"], 
+                                                                                                              row["vector_lat"]], axis=1).tolist()
+        
+        print(f'There are {len(coordination_list)-1} vector options.')
+        duration_results = self.__matrix_duration(coordination_list, profile="driving-car")
+        subset_vector["duration"] = [item for row in duration_results["durations"][1:len(subset_vector)+1] for item in row]
         # reset the index of the subset to make indexing possible again
         subset_vector = subset_vector.reset_index(drop = True)
         # select the fastest overall time
         min_idx_vec = subset_vector['duration'].idxmin()
         fastest_Vector = subset_vector.loc[min_idx_vec, 'duration']
         loc_Vector = subset_vector.loc[min_idx_vec, 'vector_loc']
-        route_Vector = subset_vector.loc[min_idx_vec, 'coordinates']
+        #route_Vector = subset_vector.loc[min_idx_vec, 'coordinates']
         loc_patient = subset_vector.loc[min_idx_vec, 'patient_loc']
         print('Duration for vectors found')
         
         dict = {'patient_loc':[loc_patient], 
                 'responder_loc':[loc_Responder], 
-                'duration_Responder':[fastest_Responder], 'route_Responder':[route_Responder],
+                'duration_Responder':[fastest_Responder],
                 'Indirect_Responder_loc':[loc_indirect_Responder], 'aed_loc':[loc_AED],
                 'duration_AED':[fastest_AED], 'route_indirect_Responder':[route_AED],
                 'vector_loc':[loc_Vector],
-                'duration_Vector':[fastest_Vector],
-                'route_Vector':[route_Vector]}
+                'duration_Vector':[fastest_Vector]}
         df = pd.DataFrame(dict)
         
         return df

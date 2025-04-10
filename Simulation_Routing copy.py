@@ -151,7 +151,7 @@ class RoutingSimulation:
 
         # Returns a list of tuples of the coordinates of the responders.
 
-    def __directions(self, coordinates, profile = 'foot-walking'):
+    def __directions(self, coordinates, profile = 'foot-walking', sleep = 0):
         """
         Function that gets the duration, route and coordinates of a route. The route can be direct or go through other points first
         Used in function: def __fastest_vector, def __direct_vs_vector, def __possible_routing_direct, def __possible_routing_indirect, def __fastest_comparisson
@@ -165,9 +165,9 @@ class RoutingSimulation:
         Returns:
         ditionary: Returns dictionary with duration, route and coordinates of the route.
         """
-        custom_client = self.CLIENT_ORS
-        #time.sleep(sleep)
-        route = custom_client.directions(
+        client = self.CLIENT_ORS
+        time.sleep(sleep)
+        route = client.client(
             coordinates=coordinates,
             profile=profile,
             format='geojson',
@@ -183,7 +183,6 @@ class RoutingSimulation:
             route_dict['duration'] = route.get('features')[0]['properties']['summary']['duration']
         route_dict['route'] = route
         route_dict['coordinates'] = route.get('features')[0]['geometry']['coordinates']
-
         return route_dict
 
     # Function to get all possible routes through the aeds that are close to the patient
@@ -251,7 +250,6 @@ class RoutingSimulation:
         
         decline_rate = decline_rate
         opening_hours = opening_hours
-        max_number_responders = max_number_responders
         # If the Responder is still 0 only the vectors time will be calculated
         if ((len(responder_loc) == 0) and (len(vector_loc) > 0)):
             print('No responder is in a 10 minute radius')
@@ -261,7 +259,7 @@ class RoutingSimulation:
             if ((len(aed_loc) == 0) or (len(responder_loc)<2)):
                 print('Comparing direct responder vs. vectors')
                 try:
-                    df_duration = self.__direct_vs_vector(patient, vector_loc, responder_loc, decline_rate, max_number_responders)
+                    df_duration = self.__direct_vs_vector(patient, vector_loc, responder_loc, decline_rate)
                 except NoResponderAcceptedError as e:
                     print(f"Warning: {e}. Falling back to fastest vector.")
                     df_duration = self.__fastest_vector(patient, vector_loc)
@@ -274,12 +272,7 @@ class RoutingSimulation:
                     df_duration = self.__fastest_vector(patient, vector_loc)
                 except NoAEDResponderAcceptedError as e2:
                     print(f"Warning: {e2}. Falling back to direct vs. vector.")
-                    try:
-                        df_duration = self.__direct_vs_vector(patient, vector_loc, responder_loc, decline_rate, max_number_responders)
-                    except NoResponderAcceptedError as e:
-                        print(f"Warning: {e}. Falling back to fastest vector.")
-                        df_duration = self.__fastest_vector(patient, vector_loc)
-
+                    df_duration = self.__direct_vs_vector(patient, vector_loc, responder_loc, decline_rate)
         # Returns a data frame.          
         return df_duration
 
@@ -320,33 +313,26 @@ class RoutingSimulation:
         # Only keep the 15 closest vectors. keep='all' so that all responders with the 5 lowest values are kept.
         # This is done to minimize the requests to the API (max = 2000 a day)
         subset_vector = Vector_df.nsmallest(15, 'dist_patient', keep='all')
-        subset_vector[['duration', 'route', 'coordinates']] = subset_vector.apply(
-            lambda row: pd.Series(self.__directions([row['vector_loc'], row['patient_loc']], 
-                                                    profile='driving-car')),axis=1)
-        
+        subset_vector['duration']=[self.__directions([i, patient_cood], profile = 'driving-car')['duration'] for i, 
+                                          patient_cood in zip(subset_vector['vector_loc'], subset_vector['patient_loc'])]
         # reset the index of the subset to make indexing possible again
         subset_vector = subset_vector.reset_index(drop = True)
         # select the fastest overall time
-        min_idx_vec = subset_vector['duration'].idxmin()
-        fastest_Vector = subset_vector.loc[min_idx_vec, 'duration']
-        loc_Vector = subset_vector.loc[min_idx_vec, 'vector_loc']
-        route_Vector = subset_vector.loc[min_idx_vec, 'coordinates']
-        loc_patient = subset_vector.loc[min_idx_vec, 'patient_loc']
+        fastest_Vector = subset_vector.iloc[subset_vector.idxmin()['duration']]['duration']
+        loc_Vector = subset_vector.iloc[subset_vector.idxmin()['duration']]['vector_loc']
+        loc_patient = subset_vector.iloc[subset_vector.idxmin()['duration']]['patient_loc']
         print('Duration for vectors found')
         
         dict = {'patient_loc':[loc_patient], 
                 'responder_loc':'No responder', 
-                'duration_Responder':'No responder', 'route_Responder':'No responder',
-                'Indirect_Responder_loc':'No AED', 'aed_loc':'No AED',
-                'duration_AED':'No AED', 'route_indirect_Responder':'No AED',
+                'duration_Responder':'No responder', 'Indirect_Responder_loc':'No AED', 'aed_loc':'No AED','duration_AED':'No AED',
                 'vector_loc':[loc_Vector],
-                'duration_Vector':[fastest_Vector],
-                'route_Vector':[route_Vector]}
+                'duration_Vector':[fastest_Vector]}
         df_vector = pd.DataFrame(dict)
         return df_vector
 
     # Function if direct responders and vectors duration are calculated
-    def __direct_vs_vector(self, patient, vector_loc, responder_loc, decline_rate, max_number_responders):
+    def __direct_vs_vector(self, patient, vector_loc, responder_loc, decline_rate):
         """
         Function calculating the time there are no aeds close by.
         Used in function: def fastest_time
@@ -401,18 +387,14 @@ class RoutingSimulation:
         Responder_df['dist_patient'] = Responder_df.apply(lambda row: geopy.distance.distance(row['responder_loc'], row['patient_loc']).meters, axis=1)
         # only keep the 15 closest responders. keep='all' so  that all responders with the 5 lowest values are kept.
         # This is done to minimize the requests to the API (max = 2000 a day)  
-        subset_responder = Responder_df.nsmallest(max_number_responders, 'dist_patient', keep='all')
-        subset_responder[['duration_direct', 'route_direct', 'coordinates_direct']] = subset_responder.apply(
-            lambda row: pd.Series(self.__directions([row['responder_loc'], row['patient_loc']], 
-                                                    profile='foot-walking')),axis=1)
-        
+        subset_responder = Responder_df.nsmallest(15, 'dist_patient', keep='all')
+        subset_responder['duration_direct']=[self.__directions([i, patient_cood], profile = 'foot-walking')['duration'] for i,
+                                             patient_cood in zip(subset_responder['responder_loc'], subset_responder['patient_loc'])]
         # reset the index of the subset to make indexing possible again
         subset_responder = subset_responder.reset_index(drop = True)
         # select the fastest overall time
-        min_idx = subset_responder['duration_direct'].idxmin()
-        fastest_Responder = subset_responder.loc[min_idx, 'duration_direct']
-        loc_Responder = subset_responder.loc[min_idx, 'responder_loc']
-        route_Responder = subset_responder.loc[min_idx, 'coordinates_direct']
+        fastest_Responder = subset_responder.iloc[subset_responder.idxmin()['duration_direct']]['duration_direct']
+        loc_Responder = subset_responder.iloc[subset_responder.idxmin()['duration_direct']]['responder_loc']
         print('Duration for responders found')
         
 
@@ -424,29 +406,22 @@ class RoutingSimulation:
         Vector_df['dist_patient'] = Vector_df.apply(lambda row: geopy.distance.distance(row['vector_loc'], row['patient_loc']).meters, axis=1)
         # only keep the 15 closest vectors. keep='all' so that more that all responders with the 5 lowest values are kept.
         # This is done to minimize the requests to the API (max = 2000 a day)
-        subset_vector = Vector_df.nsmallest(max_number_responders, 'dist_patient', keep='all')
-        subset_vector[['duration', 'route', 'coordinates']] = subset_vector.apply(
-            lambda row: pd.Series(self.__directions([row['vector_loc'], row['patient_loc']], 
-                                                    profile='driving-car')),axis=1)
+        subset_vector = Vector_df.nsmallest(15, 'dist_patient', keep='all')
+        subset_vector['duration']=[self.__directions([i, patient_cood], profile = 'driving-car')['duration'] for i, 
+                                          patient_cood in zip(subset_vector['vector_loc'], subset_vector['patient_loc'])]
         # reset the index of the subset to make indexing possible again
         subset_vector = subset_vector.reset_index(drop = True)
         # select the fastest overall time
-        min_idx_vec = subset_vector['duration'].idxmin()
-        fastest_Vector = subset_vector.loc[min_idx_vec, 'duration']
-        loc_Vector = subset_vector.loc[min_idx_vec, 'vector_loc']
-        route_Vector = subset_vector.loc[min_idx_vec, 'coordinates']
-        loc_patient = subset_vector.loc[min_idx_vec, 'patient_loc']
+        fastest_Vector = subset_vector.iloc[subset_vector.idxmin()['duration']]['duration']
+        loc_Vector = subset_vector.iloc[subset_vector.idxmin()['duration']]['vector_loc']
+        loc_patient = subset_vector.iloc[subset_vector.idxmin()['duration']]['patient_loc']
         print('Duration for vectors found')
         
         dict = {'patient_loc':[loc_patient], 
                 'responder_loc':[loc_Responder], 
-                'duration_Responder':[fastest_Responder], 'route_Responder':[route_Responder],
-                'Indirect_Responder_loc':'No AED', 'aed_loc':'No AED',
-                'duration_AED':'No AED', 'route_indirect_Responder':'No AED',
+                'duration_Responder':[fastest_Responder], 'Indirect_Responder_loc':'No AED','aed_loc':'No AED','duration_AED':'No AED',
                 'vector_loc':[loc_Vector],
-                'duration_Vector':[fastest_Vector],
-                'route_Vector':[route_Vector]}
-        
+                'duration_Vector':[fastest_Vector]}
         df = pd.DataFrame(dict)
         
         return df
@@ -493,14 +468,8 @@ class RoutingSimulation:
         # only keep the 15 closest responders. keep='all' so that more that all responders with the 15 lowest values are kept.
         # Responder_df = Responder_df.nsmallest(15, 'dist_patient')#, keep='all'
         # Responder_df = Responder_df.reset_index(drop=True)
-        Responder_df[['duration_direct', 'route_direct', 'coordinates_direct']] = Responder_df.apply(
-            lambda row: pd.Series(self.__directions([row['responder_loc'], row['patient_loc']], 
-                                                    profile='foot-walking')).reindex(
-                ['duration_direct', 'route_direct', 'coordinates_direct'], fill_value=None), axis=1)
-        
-        #Responder_df[['duration_direct', 'route_direct', 'coordinates_direct']] = Responder_df.apply(
-        #    lambda row: pd.Series(self.__directions([row['responder_loc'], row['patient_loc']], 
-        #                                            profile='foot-walking')),axis=1)
+        Responder_df['duration_direct']=[self.__directions([i, patient_cood], profile = 'foot-walking')['duration'] for i, 
+                                          patient_cood in zip(Responder_df['responder_loc'], Responder_df['patient_loc'])]
 
         return Responder_df
     
@@ -563,17 +532,15 @@ class RoutingSimulation:
 
         AED_df = AED_ISO.merge(AED_df, on='AED')
 
+
         # Delete all aeds that are not open yet
         AED_df.loc[:, 'open'] = AED_df.apply(lambda row: 1 if (row['Opens'] < opening_hours and row['Closes'] > opening_hours) else 0, axis=1)
         AED_df = AED_df[AED_df['open'] > 0]
 
-        if AED_df.empty:
-            # If the fastest direct responder and thorugh AED responder are different:
-            # - Take the fastest responders for both
-            raise NoAEDResponderAcceptedError("No AED is available during the opening hours.")
 
         # Convert AED_df to a GeoDataFrame with the correct CRS
         AED_df = gpd.GeoDataFrame(AED_df, geometry='geometry', crs="EPSG:4326")
+
         all_points = []  # Store points and midpoints as tuples
 
         # Iterate through each row in AED_df to use the 'Iso' polygons
@@ -595,14 +562,8 @@ class RoutingSimulation:
         result_df['patient_lat'] = patient.loc[0, ('latitude')]
         result_df['patient_loc'] = list(zip(result_df['patient_lon'],result_df['patient_lat']))
         
-        
-        result_df[['duration_through_AED', 'route_indirect', 'coordinates_through_AED']] = result_df.apply(
-            lambda row: pd.Series(self.__directions([row['responder_loc'], row['AED_coordinates'], row['patient_loc']], 
-                                                    profile='foot-walking')).reindex(
-                ['duration_through_AED', 'route_indirect', 'coordinates_through_AED'], fill_value=None), axis=1)
-        #result_df[['duration_through_AED', 'route_indirect', 'coordinates_through_AED']] = result_df.apply(
-        #    lambda row: pd.Series(self.__directions([row['responder_loc'], row['AED_coordinates'], row['patient_loc']], 
-        #                                            profile='foot-walking')),axis=1)
+
+        result_df['duration_through_AED']=[self.__directions([result_df['responder_loc'][i], result_df['AED_coordinates'][i],result_df['patient_loc'][i]])['duration'] for i in range(len(result_df['responder_loc']))]
         return result_df
     
     # Function to find the responder that is send directly and through the AED.
@@ -658,7 +619,10 @@ class RoutingSimulation:
                 acceptance_list.append(acceptance)
                 
         # Data frame with all the possible responders and their probability to accept the call. 1 for acceptance
-        #acceptance = list(np.random.choice([0,1], p=[decline_rate, (1-decline_rate)], size = len(Responder_df))        
+        #acceptance = list(np.random.choice([0,1], p=[decline_rate, (1-decline_rate)], size = len(Responder_df)))
+        df_acceptance = pd.DataFrame({'responder_loc' : list(possible_responder['responder_loc']),
+                                'Probability' : acceptance_list})
+        
         # merge the acceptance and the data
         # Filter out the ones that did not exept
         df_acceptance = pd.DataFrame({'responder_loc' : possible_responder,
@@ -685,64 +649,55 @@ class RoutingSimulation:
             print('We have a problem here')
 
         fastest_aed = df_duration_indirect.loc[0]
-        fastest_cpr = df_duration_direct.loc[0]
+        fastest_gpr = df_duration_direct.loc[0]
         second_fastest_aed = df_duration_indirect.loc[1]
-        second_fastest_cpr = df_duration_direct.loc[1]
+        second_fastest_gpr = df_duration_direct.loc[1]
 
         # Fastest responder going for the AED
         # Check if the 2nd fastest direct responder is faster than the fastes direct through AED
-        if second_fastest_cpr['duration_direct'] < fastest_aed['duration_through_AED']:
+        if second_fastest_gpr['duration_direct'] < fastest_aed['duration_through_AED']:
             # if so, z equal to CPR by 2nd fastest responder
-            CPR_time = fastest_aed['duration_through_AED'] - second_fastest_cpr['duration_direct']
-            surv_A = self.__survival_probability(second_fastest_cpr['duration_direct'], CPR_time)
+            CPR_time = fastest_aed['duration_through_AED'] - second_fastest_gpr['duration_direct']
+            surv_A = self.__survival_probability(second_fastest_gpr['duration_direct'], CPR_time)
         else:
             # - z equals zero as no one does any CPR
             surv_A = self.__survival_probability(fastest_aed['duration_through_AED'], 0)
         # 2nd fastest responder arriving with AED
         # - time until AED arrives minus time CPR arrives is the time without CPR
-        surv_B = self.__survival_probability(fastest_cpr['duration_direct'], second_fastest_aed['duration_through_AED']-fastest_cpr['duration_direct'])    
+        surv_B = self.__survival_probability(fastest_gpr['duration_direct'], second_fastest_aed['duration_through_AED']-fastest_gpr['duration_direct'])    
                 
         # Check if the fastest through AED is the same as the fastest direct 
-        if fastest_aed['responder_loc']==fastest_cpr['responder_loc']:
+        if fastest_aed['responder_loc']==fastest_gpr['responder_loc']:
             # Find best strategy which is the maximal survival chances
             best_strategy = max(surv_A, surv_B)
             # Send responders
             if best_strategy == surv_A:
                 # - Second fastest direct time will be send directly  
                 # - Fastest direct and AED responder will be send through the AED
-                coord_direct = second_fastest_cpr['responder_loc']
-                duration_direct = second_fastest_cpr['duration_direct']
-                route_direct = second_fastest_cpr['route_direct']
+                coord_direct = second_fastest_gpr['responder_loc']
+                duration_direct = second_fastest_gpr['duration_direct']
                 coord_AED =  fastest_aed['responder_loc']
                 AED_coordinates = fastest_aed['AED_coordinates']
                 duration_indirect = fastest_aed['duration_through_AED']
-                route_indirect = fastest_aed['route_indirect']
             # If this is not true:
             # - Fastes direct responder will be send directly
             # - Second fastest through AED responder will be send through the AED
             else:
-                coord_direct = fastest_cpr['responder_loc']
-                duration_direct = fastest_cpr['duration_direct']
-                route_direct = fastest_cpr['route_direct']
+                coord_direct = fastest_gpr['responder_loc']
+                duration_direct = fastest_gpr['duration_direct']
                 coord_AED = second_fastest_aed['responder_loc']
                 AED_coordinates = second_fastest_aed['AED_coordinates']
                 duration_indirect = second_fastest_aed['duration_through_AED']
-                route_indirect = second_fastest_aed['route_indirect']
         else:
             # If the fastest direct responder and thorugh AED responder are different:
             # - Take the fastest responders for both
-            coord_direct = fastest_cpr['responder_loc']
-            duration_direct = fastest_cpr['duration_direct']
-            route_direct = fastest_cpr['route_direct']
+            coord_direct = fastest_gpr['responder_loc']
+            duration_direct = fastest_gpr['duration_direct']
             coord_AED = fastest_aed['responder_loc']
             AED_coordinates = fastest_aed['AED_coordinates']
             duration_indirect = fastest_aed['duration_through_AED']
-            route_indirect = fastest_aed['route_indirect']
             
-            
-        return {'coord_direct': coord_direct, 'duration_direct':duration_direct, 'route_direct':route_direct,
-        'coord_AED': coord_AED, 'AED_coordinates': AED_coordinates, 'duration_through_AED':duration_indirect, 
-        'route_indirect':route_indirect}
+        return {'coord_direct': coord_direct, 'duration_direct':duration_direct,'coord_AED': coord_AED, 'AED_coordinates': AED_coordinates, 'duration_through_AED':duration_indirect}
 
     # Function to build a data frame with the fastest direct, indirect and vector duration.
     def __fastest_comparisson(self, patient, vector_loc, responder_loc, aed_loc, max_number_responders, decline_rate, opening_hours, filter_values):
@@ -774,11 +729,9 @@ class RoutingSimulation:
         responders_send = self.__send_responders(patient,  responder_loc, aed_loc, max_number_responders, decline_rate, opening_hours, filter_values)
         loc_Responder = responders_send['coord_direct']
         fastest_Responder = responders_send['duration_direct']
-        route_Responder = responders_send['route_direct']
         loc_AED = responders_send['AED_coordinates']
         loc_indirect_Responder = responders_send['coord_AED']
         fastest_AED = responders_send['duration_through_AED']
-        route_AED = responders_send['route_indirect']
         
         Vector_df = pd.DataFrame(vector_loc)
         Vector_df.rename(columns = {'coordinates':'vector_loc'}, inplace = True)
@@ -788,28 +741,25 @@ class RoutingSimulation:
         Vector_df['dist_patient'] = Vector_df.apply(lambda row: geopy.distance.distance(row['vector_loc'], row['patient_loc']).meters, axis=1)
         # only keep the 5 closest vectors. keep='all' so that more that all responders with the 5 lowest values are kept.
         # This is done to minimize the requests to the API (max = 2000 a day) 
-        subset_vector = Vector_df.nsmallest(15, 'dist_patient', keep='all')
-        subset_vector[['duration', 'route', 'coordinates']] = subset_vector.apply(
-            lambda row: pd.Series(self.__directions([row['vector_loc'], row['patient_loc']], 
-                                                    profile='driving-car')),axis=1)
+        subset_vector = Vector_df.nsmallest(5, 'dist_patient', keep='all')
+        subset_vector['duration']=[self.__directions([i, patient_cood], profile = 'driving-car')['duration'] for i, 
+                                          patient_cood in zip(subset_vector['vector_loc'], subset_vector['patient_loc'])]
         # reset the index of the subset to make indexing possible again
         subset_vector = subset_vector.reset_index(drop = True)
         # select the fastest overall time
-        min_idx_vec = subset_vector['duration'].idxmin()
-        fastest_Vector = subset_vector.loc[min_idx_vec, 'duration']
-        loc_Vector = subset_vector.loc[min_idx_vec, 'vector_loc']
-        route_Vector = subset_vector.loc[min_idx_vec, 'coordinates']
-        loc_patient = subset_vector.loc[min_idx_vec, 'patient_loc']
+        fastest_Vector = subset_vector.iloc[subset_vector.idxmin()['duration']]['duration']
+        loc_Vector = subset_vector.iloc[subset_vector.idxmin()['duration']]['vector_loc']
+        loc_patient = subset_vector.iloc[subset_vector.idxmin()['duration']]['patient_loc']
         print('Duration for vectors found')
         
         dict = {'patient_loc':[loc_patient], 
                 'responder_loc':[loc_Responder], 
-                'duration_Responder':[fastest_Responder], 'route_Responder':[route_Responder],
-                'Indirect_Responder_loc':[loc_indirect_Responder], 'aed_loc':[loc_AED],
-                'duration_AED':[fastest_AED], 'route_indirect_Responder':[route_AED],
+                'duration_Responder':[fastest_Responder], 
+                'Indirect_Responder_loc':[loc_indirect_Responder], 
+                'aed_loc':[loc_AED],
+                'duration_AED':[fastest_AED],
                 'vector_loc':[loc_Vector],
-                'duration_Vector':[fastest_Vector],
-                'route_Vector':[route_Vector]}
+                'duration_Vector':[fastest_Vector]}
         df = pd.DataFrame(dict)
         
         return df

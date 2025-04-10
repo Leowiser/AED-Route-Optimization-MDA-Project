@@ -7,8 +7,11 @@ from shapely import geometry
 import time
 import geopy.distance
 import random
-from Simulation_Class_update_2nd import RoutingSimulation
-
+from Simulation_Routing import RoutingSimulation
+from Simulation_Routing_Matrix import RoutingSimulationMatrix
+from Simulation_Routing_Matrix_copy import RoutingSimulationMatrixSec
+from Simulation_Routing_Matrix_Batch import RoutingSimulationMatrixBatch
+from tqdm import tqdm
 
 # Exception class
 #------------------------------------------------------------------------------------------------------------------------
@@ -122,31 +125,40 @@ class Simulation:
         if filter_values is not None and not set(filter_values).issubset(possible_list):
             raise NotAcceptableInput(exception_input._str_input(filter_values, possible_list))
         
-        df_final = pd.DataFrame(columns = ['Patient_loc', 'Responder_loc', 'duration_Responder', 'route_Responder',
-                                           'Indirect_Responder_loc', 'AED_loc', 'duration_AED', 'route_indirect_Responder',
-                                           'Vector_loc', 'duration_Vector', 'route_Vector', 'prob_vec', 'prob_resp'])
+        df_final = pd.DataFrame(columns = ['patient_loc', 'responder_loc', 'duration_Responder',
+                                           'Indirect_Responder_loc', 'aed_loc', 'duration_AED',
+                                           'vector_loc', 'duration_Vector', 'prob_vec', 'prob_resp'])
 
         
         responders = self._generate_cfrs(time_of_day, proportion)
         responders = responders.reset_index(drop=True)
         ip = self.IP
-        routing = RoutingSimulation(ip)
+        routing = RoutingSimulationMatrixBatch(ip)
 
-        for _, patient in self.PATIENTS.iterrows():
-            df = routing.fastest_time(patient, responders, self.VECTORS, decline_rate, 
-                                      max_number_responder, opening_hour, filter_values, dist_responder, dist_AED, dist_Vector)
-            # Extract relevant durations
-            df['duration_AED'] = df['duration_AED'].replace('No AED', float(10000))
-            df['duration_Responder'] = df['duration_Responder'].replace('No responder', float(10000))
-            duration_responder = df['duration_Responder'].iloc[0] if 'duration_Responder' in df.columns else None
-            duration_AED = df['duration_AED'].iloc[0] if 'duration_AED' in df.columns else None
-            duration_vector = df['duration_Vector'].iloc[0] if 'duration_Vector' in df.columns else None
+        for _, patient in tqdm(self.PATIENTS.iterrows(), total=self.PATIENTS.shape[0]):
+            try:
+                df = routing.fastest_time(patient, responders, self.VECTORS, decline_rate, 
+                                        max_number_responder, opening_hour, filter_values, dist_responder, dist_AED, dist_Vector)
+                
+                # Handle missing durations safely
+                df['duration_AED'] = df['duration_AED'].replace('No AED', float(10000))
+                df['duration_Responder'] = df['duration_Responder'].replace('No responder', float(10000))
 
-            prob_resp, prob_vec = self.__probability_survival(duration_responder, duration_AED, duration_vector)
-            df['prob_vec'] = prob_vec
-            df['prob_resp'] = prob_resp
-            df_final = pd.concat([df_final,df])
-            df_final = df_final.reset_index(drop = True)
+                duration_responder = df['duration_Responder'].iloc[0] if 'duration_Responder' in df.columns else None
+                duration_AED = df['duration_AED'].iloc[0] if 'duration_AED' in df.columns else None
+                duration_vector = df['duration_Vector'].iloc[0] if 'duration_Vector' in df.columns else None
+
+                prob_resp, prob_vec = self.__probability_survival(duration_responder, duration_AED, duration_vector)
+                df['prob_vec'] = prob_vec
+                df['prob_resp'] = prob_resp
+
+                df_final = pd.concat([df_final, df])
+                df_final = df_final.reset_index(drop=True)
+
+            except Exception as e:
+                # Skip this patient and log the error
+                print(f"[Warning] Error with patient: {patient.get('id', 'unknown')}. Skipping. Error: {str(e)}")
+                continue
         
         return df_final
     
@@ -232,7 +244,7 @@ class Simulation:
             labels = ["Responder", "Vector Real"]
 
             # Plot each series
-            for idx, (df, column, label) in enumerate(zip(df_list, columns, labels)):
+            for idx, (df, column, label) in tqdm(enumerate(zip(df_list, columns, labels)), total=len(df_list)):
                 color = COLOR_SCALE[idx]
                 
                 # Plot line with markers
