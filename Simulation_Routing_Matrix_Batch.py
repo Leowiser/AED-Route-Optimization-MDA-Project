@@ -787,52 +787,34 @@ class RoutingSimulationMatrixBatch:
     
 
     def batch_matrix_duration(self, coordinates, batch_size=10, profile='foot-walking'):
-        """
-        Splits the origins (all coordinates after the destination) into batches of size batch_size,
-        and calls __matrix_duration for each batch. The function then combines all outputs.
-        
-        Parameters:
-        coordinates (list): A list with the first element as the destination and the rest as origins,
-                            e.g. [[dest_lon, dest_lat], [origin1_lon, origin1_lat], ...]
-        batch_size (int): The maximum number of origins to process per batch.
-        profile (str): The routing profile to be used for __matrix_duration.
-        
-        Returns:
-        combined_results (list): A list of durations corresponding to each origin in the original order.
-                                    (Assumes __matrix_duration returns a dictionary with a key 'durations'
-                                    where matrix['durations'][i][0] is the travel time from the i-th origin to the destination.)
-        """
-        # The destination is the first coordinate.
+        if len(coordinates) < 2:
+            raise ValueError("At least one origin and one destination required.")
+
         destination = coordinates[0]
         origins = coordinates[1:]
-        
         combined_results = []
-        
-        # Process origins in chunks (batches) of size batch_size.
-        for i in range(0, len(origins), batch_size):
-            try:
-                # Get a batch of origins.
-                batch_origins = origins[i:i+batch_size]
-                # Form the coordinate list for the matrix: destination first, then the batch.
+
+        i = 0
+        while i < len(origins):
+            batch_processed = False
+            for size in [batch_size, batch_size // 2, max(1, batch_size // 4)]:
+                batch_origins = origins[i:i+size]
                 batch_coords = [destination] + batch_origins
-                
-                # Call the matrix function on the current batch.
-                matrix = self.__matrix_duration(coordinates=batch_coords, profile=profile)
-            except:
-                smaller_batch = batch_size//2
-                # Get a batch of origins.
-                batch_origins = origins[i:i+smaller_batch]
-                # Form the coordinate list for the matrix: destination first, then the batch.
-                batch_coords = [destination] + batch_origins
-                
-                # Call the matrix function on the current batch.
-                matrix = self.__matrix_duration(coordinates=batch_coords, profile=profile)
+                try:
+                    matrix = self.__matrix_duration(coordinates=batch_coords, profile=profile)
+                    for j in range(1, len(matrix['durations'])):
+                        combined_results.append(matrix['durations'][j][0])
+                    i += size  # move index forward
+                    batch_processed = True
+                    break  # exit fallback loop
+                except Exception as e:
+                    continue  # try smaller batch
             
-            # The duration from an origin to the destination is assumed to be at matrix['durations'][i][0]
-            # for i=1,..., len(batch_origins). So we loop through these indices.
-            for j in range(1, len(matrix['durations'])):
-                combined_results.append(matrix['durations'][j][0])
-        
+            if not batch_processed:
+                # Skip this batch and log the failure
+                print(f"[Warning] Failed to process origins at index {i}. Skipping batch.")
+                i += 1  # skip just one origin to avoid getting stuck in an infinite loop
+
         return combined_results
 
     # Function to find the responder that is send directly and through the AED.

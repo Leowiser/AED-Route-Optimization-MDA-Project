@@ -10,6 +10,7 @@ import random
 from Simulation_Routing import RoutingSimulation
 from Simulation_Routing_Matrix import RoutingSimulationMatrix
 from Simulation_Routing_Matrix_copy import RoutingSimulationMatrixSec
+from Simulation_Routing_Matrix_Batch import RoutingSimulationMatrixBatch
 from tqdm import tqdm
 
 # Exception class
@@ -132,23 +133,32 @@ class Simulation:
         responders = self._generate_cfrs(time_of_day, proportion)
         responders = responders.reset_index(drop=True)
         ip = self.IP
-        routing = RoutingSimulationMatrixSec(ip)
+        routing = RoutingSimulationMatrixBatch(ip)
 
         for _, patient in tqdm(self.PATIENTS.iterrows(), total=self.PATIENTS.shape[0]):
-            df = routing.fastest_time(patient, responders, self.VECTORS, decline_rate, 
-                                      max_number_responder, opening_hour, filter_values, dist_responder, dist_AED, dist_Vector)
-            # Extract relevant durations
-            df['duration_AED'] = df['duration_AED'].replace('No AED', float(10000))
-            df['duration_Responder'] = df['duration_Responder'].replace('No responder', float(10000))
-            duration_responder = df['duration_Responder'].iloc[0] if 'duration_Responder' in df.columns else None
-            duration_AED = df['duration_AED'].iloc[0] if 'duration_AED' in df.columns else None
-            duration_vector = df['duration_Vector'].iloc[0] if 'duration_Vector' in df.columns else None
+            try:
+                df = routing.fastest_time(patient, responders, self.VECTORS, decline_rate, 
+                                        max_number_responder, opening_hour, filter_values, dist_responder, dist_AED, dist_Vector)
+                
+                # Handle missing durations safely
+                df['duration_AED'] = df['duration_AED'].replace('No AED', float(10000))
+                df['duration_Responder'] = df['duration_Responder'].replace('No responder', float(10000))
 
-            prob_resp, prob_vec = self.__probability_survival(duration_responder, duration_AED, duration_vector)
-            df['prob_vec'] = prob_vec
-            df['prob_resp'] = prob_resp
-            df_final = pd.concat([df_final,df])
-            df_final = df_final.reset_index(drop = True)
+                duration_responder = df['duration_Responder'].iloc[0] if 'duration_Responder' in df.columns else None
+                duration_AED = df['duration_AED'].iloc[0] if 'duration_AED' in df.columns else None
+                duration_vector = df['duration_Vector'].iloc[0] if 'duration_Vector' in df.columns else None
+
+                prob_resp, prob_vec = self.__probability_survival(duration_responder, duration_AED, duration_vector)
+                df['prob_vec'] = prob_vec
+                df['prob_resp'] = prob_resp
+
+                df_final = pd.concat([df_final, df])
+                df_final = df_final.reset_index(drop=True)
+
+            except Exception as e:
+                # Skip this patient and log the error
+                print(f"[Warning] Error with patient: {patient.get('id', 'unknown')}. Skipping. Error: {str(e)}")
+                continue
         
         return df_final
     
