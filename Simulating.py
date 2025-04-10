@@ -7,8 +7,10 @@ from shapely import geometry
 import time
 import geopy.distance
 import random
-from Simulation_Class_update_2nd import RoutingSimulation
-
+from Simulation_Routing import RoutingSimulation
+from Simulation_Routing_Matrix import RoutingSimulationMatrix
+from Simulation_Routing_Matrix_copy import RoutingSimulationMatrixSec
+from tqdm import tqdm
 
 # Exception class
 #------------------------------------------------------------------------------------------------------------------------
@@ -122,17 +124,17 @@ class Simulation:
         if filter_values is not None and not set(filter_values).issubset(possible_list):
             raise NotAcceptableInput(exception_input._str_input(filter_values, possible_list))
         
-        df_final = pd.DataFrame(columns = ['Patient_loc', 'Responder_loc', 'duration_Responder', 'route_Responder',
-                                           'Indirect_Responder_loc', 'AED_loc', 'duration_AED', 'route_indirect_Responder',
-                                           'Vector_loc', 'duration_Vector', 'route_Vector', 'prob_vec', 'prob_resp'])
+        df_final = pd.DataFrame(columns = ['patient_loc', 'responder_loc', 'duration_Responder',
+                                           'Indirect_Responder_loc', 'aed_loc', 'duration_AED',
+                                           'vector_loc', 'duration_Vector', 'prob_vec', 'prob_resp'])
 
         
         responders = self._generate_cfrs(time_of_day, proportion)
         responders = responders.reset_index(drop=True)
         ip = self.IP
-        routing = RoutingSimulation(ip)
+        routing = RoutingSimulationMatrixSec(ip)
 
-        for _, patient in self.PATIENTS.iterrows():
+        for _, patient in tqdm(self.PATIENTS.iterrows(), total=self.PATIENTS.shape[0]):
             df = routing.fastest_time(patient, responders, self.VECTORS, decline_rate, 
                                       max_number_responder, opening_hour, filter_values, dist_responder, dist_AED, dist_Vector)
             # Extract relevant durations
@@ -232,7 +234,7 @@ class Simulation:
             labels = ["Responder", "Vector Real"]
 
             # Plot each series
-            for idx, (df, column, label) in enumerate(zip(df_list, columns, labels)):
+            for idx, (df, column, label) in tqdm(enumerate(zip(df_list, columns, labels)), total=len(df_list)):
                 color = COLOR_SCALE[idx]
                 
                 # Plot line with markers
