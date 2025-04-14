@@ -30,7 +30,7 @@ class RoutingSimulationMatrixBatch:
     def __init__(self, ip):
         self.IP = ip
         self.CLIENT_ORS = openrouteservice.Client(base_url=f'http://{self.IP}:8080/ors')
-        self.AED_FILE_PATH = 'C:/Users/leonw/OneDrive - KU Leuven/Documents/GitHub/AED-Route-Optimization-MDA-Project/Data/temp.gpkg'
+        self.AED_FILE_PATH = 'Data/temp.gpkg'
         self.AED_LAYER = 'AED_data'
         
         aeds = gpd.read_file(self.AED_FILE_PATH, layer=self.AED_LAYER)

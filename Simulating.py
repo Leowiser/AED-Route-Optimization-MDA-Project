@@ -57,11 +57,11 @@ class Simulation:
         self.AMBULANCES = pd.read_parquet("Data/ambulance_locations.parquet.gzip")
         self.VECTORS = self.__clean_vector()
         self.STAT_SEC_GEOMETRIES = gpd.read_file("C:/Users/leonw/Downloads/first_responder_generation.gpkg")
-        intervention = pd.read_excel("C:/Users/leonw/OneDrive - KU Leuven/Documents/GitHub/AED-Route-Optimization-MDA-Project/Data/interventions_new.xlsx")
+        intervention = pd.read_excel("Data/interventions_new.xlsx")
         intervention.rename(columns = {'longitude_intervention':'longitude', 'latitude_intervention':'latitude'}, inplace = True)
         intervention['coordinates'] = list(zip(intervention['longitude'], intervention['latitude']))
         self.PATIENTS = intervention.copy()
-        self.AED_ISO = gpd.read_file('C:/Users/leonw/OneDrive - KU Leuven/Documents/GitHub/AED-Route-Optimization-MDA-Project/Data/temp.gpkg', layer='AED_data')
+        self.AED_ISO = gpd.read_file('Data/temp.gpkg', layer='AED_data')
 
 
     def __clean_vector(self):
