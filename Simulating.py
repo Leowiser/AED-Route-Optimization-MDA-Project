@@ -50,7 +50,7 @@ class NotAcceptableInput(Exception):
 
 
 class Simulation:
-    def __init__(self, ip):
+    def __init__(self, ip, all = False):
         self.IP = ip
         self.CLIENT_ORS = openrouteservice.Client(base_url=f'http://{self.IP}:8080/ors')
         self.AEDs = pd.read_csv("Data/filtered_AED_loc.csv")
@@ -61,7 +61,11 @@ class Simulation:
         intervention.rename(columns = {'longitude_intervention':'longitude', 'latitude_intervention':'latitude'}, inplace = True)
         intervention['coordinates'] = list(zip(intervention['longitude'], intervention['latitude']))
         self.PATIENTS = intervention.copy()
-        self.AED_ISO = gpd.read_file('Data/temp.gpkg', layer='AED_data')
+        AED_ISO = gpd.read_file('Data/temp.gpkg', layer='AED_data')
+        if all:
+            AED_ISO["Opens"] = 0
+            AED_ISO["Closes"] = 24
+        self.AED_ISO = AED_ISO
 
 
     def __clean_vector(self):
