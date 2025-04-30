@@ -50,19 +50,17 @@ class NotAcceptableInput(Exception):
 
 
 class Simulation:
-    def __init__(self, ip, all=False):
+    def __init__(self, ip, all = False):
         self.IP = ip
         self.CLIENT_ORS = openrouteservice.Client(base_url=f'http://{self.IP}:8080/ors')
         self.AEDs = pd.read_csv("Data/filtered_AED_loc.csv")
         self.AMBULANCES = pd.read_parquet("Data/ambulance_locations.parquet.gzip")
         self.VECTORS = self.__clean_vector()
         self.STAT_SEC_GEOMETRIES = gpd.read_file("Data/first_responder_generation.gpkg")
-
         intervention = pd.read_excel("Data/interventions_doubleplusnew.xlsx")
-        intervention.rename(columns={'longitude_intervention': 'longitude', 'latitude_intervention': 'latitude'}, inplace=True)
+        intervention.rename(columns = {'longitude_intervention':'longitude', 'latitude_intervention':'latitude'}, inplace = True)
         intervention['coordinates'] = list(zip(intervention['longitude'], intervention['latitude']))
         self.PATIENTS = intervention.copy()
-
         AED_ISO = gpd.read_file('Data/temp.gpkg', layer='AED_data')
         if all:
             AED_ISO["Opens"] = 0
