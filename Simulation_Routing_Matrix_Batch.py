@@ -43,6 +43,8 @@ class RoutingSimulationMatrixBatch:
         new_close = new_close.apply(pd.to_numeric, errors='coerce') 
         new_close['TIME'] = new_close[0] + (new_close[1] / 60)
         aeds['Closes'] = new_close['TIME']
+        aeds['Closes'] = aeds['Closes'].fillna(24.0)
+        
         if all_open:
             aeds["Opens"] = 0
             aeds["Closes"] = 24
