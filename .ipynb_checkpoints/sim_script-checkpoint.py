@@ -127,7 +127,7 @@ def main():
         for open_hr in opening_hours:
             for max_resp in max_responders:
                 for open_setting in aeds_all_open:
-                    run_simulation(
+                    simulation_run(
                         ip=ip,
                         num_sim=num_sims,
                         max_num_resp=max_resp,
