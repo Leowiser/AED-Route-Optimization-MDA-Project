@@ -50,7 +50,7 @@ class NotAcceptableInput(Exception):
 
 
 class Simulation:
-    def __init__(self, ip, all = False):
+    def __init__(self, ip, all_open = False):
         self.IP = ip
         self.CLIENT_ORS = openrouteservice.Client(base_url=f'http://{self.IP}:8080/ors')
         self.AEDs = pd.read_csv("Data/filtered_AED_loc.csv")
@@ -61,10 +61,8 @@ class Simulation:
         intervention.rename(columns = {'longitude_intervention':'longitude', 'latitude_intervention':'latitude'}, inplace = True)
         intervention['coordinates'] = list(zip(intervention['longitude'], intervention['latitude']))
         self.PATIENTS = intervention.copy()
+        self.all_open = all_open
         AED_ISO = gpd.read_file('Data/temp.gpkg', layer='AED_data')
-        if all:
-            AED_ISO["Opens"] = 0
-            AED_ISO["Closes"] = 24
         self.AED_ISO = AED_ISO
 
 
@@ -137,7 +135,7 @@ class Simulation:
         responders = self._generate_cfrs(time_of_day, proportion)
         responders = responders.reset_index(drop=True)
         ip = self.IP
-        routing = RoutingSimulationMatrixBatch(ip)
+        routing = RoutingSimulationMatrixBatch(ip, self.all_open)
 
         for _, patient in tqdm(self.PATIENTS.iterrows(), total=self.PATIENTS.shape[0]):
             try:
