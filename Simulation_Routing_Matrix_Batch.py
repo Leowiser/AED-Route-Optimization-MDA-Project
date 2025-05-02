@@ -27,7 +27,7 @@ class NoAEDResponderAcceptedError(Exception):
 
 
 class RoutingSimulationMatrixBatch:
-    def __init__(self, ip):
+    def __init__(self, ip, all_open=False):
         self.IP = ip
         self.CLIENT_ORS = openrouteservice.Client(base_url=f'http://{self.IP}:8080/ors')
         self.AED_FILE_PATH = 'Data/temp.gpkg'
@@ -43,6 +43,9 @@ class RoutingSimulationMatrixBatch:
         new_close = new_close.apply(pd.to_numeric, errors='coerce') 
         new_close['TIME'] = new_close[0] + (new_close[1] / 60)
         aeds['Closes'] = new_close['TIME']
+        if all_open:
+            aeds["Opens"] = 0
+            aeds["Closes"] = 24
         self.AED_ISO = aeds
 
 
