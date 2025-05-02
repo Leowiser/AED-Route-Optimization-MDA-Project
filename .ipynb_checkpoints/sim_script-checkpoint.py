@@ -113,7 +113,7 @@ def simulation_run(
 def main():
     ip = "35.159.16.25"
 
-    num_sims = [3]
+    num_sims = 3
     props_cfrs = [
         0.0025, 0.005, 0.0075, 0.01,
         0.0125, 0.015, 0.0175, 0.02,
@@ -127,15 +127,14 @@ def main():
         for open_hr in opening_hours:
             for max_resp in max_responders:
                 for open_setting in aeds_all_open:
-                    for num_sim in num_sims:
-                        run_simulation(
-                            ip=ip,
-                            num_sim=num_sim,
-                            max_num_resp=max_resp,
-                            open_hr=open_hr,
-                            prop_cfr=prop_cfr,
-                            all_open=open_setting
-                        )
+                    run_simulation(
+                        ip=ip,
+                        num_sim=num_sims,
+                        max_num_resp=max_resp,
+                        open_hr=open_hr,
+                        prop_cfr=prop_cfr,
+                        all_open=open_setting
+                    )
 
 
 if __name__ == "__main__":
